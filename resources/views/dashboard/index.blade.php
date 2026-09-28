@@ -1,0 +1,40 @@
+@extends('layouts.app')
+@section('title', 'Dashboard — ' . config('icoep.app_name'))
+
+@section('content')
+{{-- Section-specific content rendered from partials --}}
+@switch($currentSection)
+    @case('facilities')
+        @include('dashboard.partials._facilities')
+        @break
+    @case('equipment')
+        @include('dashboard.partials._equipment')
+        @break
+    @case('events')
+        @include('dashboard.partials._events')
+        @break
+    @case('announcements')
+        @include('dashboard.partials._announcements')
+        @break
+    @case('users')
+        @include('dashboard.partials._users')
+        @break
+    @case('inventory')
+        @include('dashboard.partials._inventory')
+        @break
+    @case('manage-bookings')
+        @include('dashboard.partials._manage_bookings')
+        @break
+    @case('manage-equipment')
+        @include('dashboard.partials._manage_equipment')
+        @break
+    @case('reports')
+        @include('dashboard.partials._reports')
+        @break
+    @case('calendar')
+        @include('dashboard.partials._calendar')
+        @break
+    @default
+        @include('dashboard.partials._overview')
+@endswitch
+@endsection

@@ -1,0 +1,16 @@
+{
+  "name": "ICOEP Campus Operations",
+  "short_name": "ICOEP",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0ea5e9",
+  "theme_color": "#0ea5e9",
+  "description": "Centralized campus operations, facility reservations, equipment logistics, and school-wide event management.",
+  "icons": [
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
