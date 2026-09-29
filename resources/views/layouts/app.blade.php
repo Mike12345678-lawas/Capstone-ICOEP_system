@@ -19,7 +19,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- Vite assets: Tailwind CSS v4 + app scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -77,7 +77,7 @@
 
                     <!-- User Menu -->
                     <div class="user-menu-wrapper" id="userMenuWrapper">
-                        <button class="user-menu-trigger" id="userMenuTrigger">
+                        <button class="user-menu-trigger" id="userMenuTrigger" aria-label="User menu">
                             <div class="user-avatar">
                                 {{ auth()->user()->initials }}
                             </div>
@@ -139,7 +139,6 @@
     </footer>
 
     <!-- Additional page-level scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     @stack('scripts')
     
     <!-- PWA Service Worker Registration -->

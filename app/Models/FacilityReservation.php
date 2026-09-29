@@ -42,7 +42,7 @@ class FacilityReservation extends Model
     {
         return $query->where('facility_id', $facilityId)
             ->where('reservation_date', $date)
-            ->whereIn('status', ['pending', 'approved'])
+            ->where('status', 'approved')
             ->where(function ($q) use ($start, $end) {
                 $q->where('time_start', '<', $end)
                   ->where('time_end', '>', $start);

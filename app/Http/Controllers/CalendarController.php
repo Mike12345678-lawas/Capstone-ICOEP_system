@@ -27,23 +27,26 @@ class CalendarController extends Controller
             $start = $request->filled('start') ? Carbon::parse($request->start)->startOfDay() : Carbon::now()->startOfMonth();
             $end = $request->filled('end') ? Carbon::parse($request->end)->endOfDay() : Carbon::now()->endOfMonth();
 
-            // 3. Fetch facility reservations with null-safety on relations
+            // 3. Fetch facility reservations with null-safety on relations (approved and pending)
             $reservations = FacilityReservation::with('facility')
-                ->where('status', 'approved')
+                ->whereIn('status', ['approved', 'pending'])
                 ->whereBetween('reservation_date', [$start, $end])
                 ->get()
                 ->map(function ($res) {
+                    $color = $res->status === 'approved' ? '#10b981' : '#f59e0b';
+                    $borderColor = $res->status === 'approved' ? '#059669' : '#d97706';
                     return [
                         'id' => 'res_' . $res->id,
-                        'title' => ($res->facility->name ?? 'Unknown Facility') . ' - ' . $res->title,
+                        'title' => ($res->facility->name ?? 'Unknown Facility') . ' - ' . $res->title . ($res->status === 'pending' ? ' (Pending)' : ''),
                         'start' => Carbon::parse($res->reservation_date)->format('Y-m-d') . 'T' . $res->time_start,
                         'end' => Carbon::parse($res->reservation_date)->format('Y-m-d') . 'T' . $res->time_end,
-                        'backgroundColor' => '#10b981', // green for facilities
-                        'borderColor' => '#059669',
+                        'backgroundColor' => $color,
+                        'borderColor' => $borderColor,
                         'textColor' => '#ffffff',
                         'url' => url('/facilities/' . $res->facility_id),
                         'extendedProps' => [
                             'type' => 'reservation',
+                            'reservation_status' => $res->status,
                             'description' => $res->description
                         ]
                     ];
@@ -54,17 +57,30 @@ class CalendarController extends Controller
                 ->whereBetween('event_date', [$start, $end])
                 ->get()
                 ->map(function ($event) {
+                    $color = '#3b82f6';
+                    $borderColor = '#2563eb';
+                    if ($event->event_type === 'sports') {
+                        $color = '#3b82f6';
+                        $borderColor = '#2563eb';
+                    } elseif ($event->event_type === 'academic') {
+                        $color = '#8b5cf6';
+                        $borderColor = '#7c3aed';
+                    } elseif ($event->event_type === 'spiritual') {
+                        $color = '#6366f1';
+                        $borderColor = '#4f46e5';
+                    }
                     return [
                         'id' => 'evt_' . $event->id,
-                        'title' => '[Event] ' . $event->title,
+                        'title' => '[' . ucfirst($event->event_type ?? 'Event') . '] ' . $event->title,
                         'start' => Carbon::parse($event->event_date)->format('Y-m-d') . 'T' . $event->time_start,
                         'end' => Carbon::parse($event->event_date)->format('Y-m-d') . 'T' . $event->time_end,
-                        'backgroundColor' => '#3b82f6', // blue for events
-                        'borderColor' => '#2563eb',
+                        'backgroundColor' => $color,
+                        'borderColor' => $borderColor,
                         'textColor' => '#ffffff',
                         'url' => url('/events/' . $event->id),
                         'extendedProps' => [
                             'type' => 'event',
+                            'event_type' => $event->event_type,
                             'description' => $event->description
                         ]
                     ];

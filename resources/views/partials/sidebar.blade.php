@@ -92,13 +92,13 @@
             </div>
         </div>
 
-        @if($roleName === 'Administrator' || $roleName === 'Staff')
+        @if(auth()->user()->hasPermission('facility.approve') || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('user.view'))
         <div class="nav-section">
             <div class="nav-section-title">
                 <span>Management</span>
             </div>
             <div class="nav-section-content">
-                @if($roleName === 'Administrator')
+                @if(auth()->user()->hasPermission('user.view'))
                 <a href="{{ url('/dashboard?section=users') }}" class="nav-link {{ $currentSection === 'users' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -110,33 +110,40 @@
                 </a>
                 @endif
 
+                @if(auth()->user()->hasPermission('facility.approve'))
                 <a href="{{ url('/dashboard?section=manage-bookings') }}" class="nav-link {{ $currentSection === 'manage-bookings' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
                     </svg>
-                    <span>Manage Bookings</span>
+                    <span>Booking Requests</span>
                 </a>
+                @endif
 
+                @if(auth()->user()->hasPermission('equipment.approve'))
                 <a href="{{ url('/dashboard?section=manage-equipment') }}" class="nav-link {{ $currentSection === 'manage-equipment' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
                         <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
                     </svg>
-                    <span>Manage Equipment</span>
+                    <span>Equipment Requests</span>
                 </a>
+                @endif
 
+                @if(auth()->user()->hasPermission('equipment.manage'))
                 <a href="{{ url('/dashboard?section=inventory') }}" class="nav-link {{ $currentSection === 'inventory' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>
                         <line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
                     </svg>
-                    <span>Inventory</span>
+                    <span>Equipment Inventory</span>
                 </a>
+                @endif
             </div>
         </div>
         @endif
 
-        @if($roleName === 'Administrator')
+
+        @if(auth()->user()->hasPermission('report.view'))
         <div class="nav-section">
             <div class="nav-section-title">
                 <span>Reports</span>

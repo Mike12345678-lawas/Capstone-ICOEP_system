@@ -30,13 +30,19 @@
                         <td>{{ $f->location }}</td>
                         <td>{{ $f->capacity }}</td>
                         <td>
-                            @php $sb = match($f->status) { 'available' => 'badge-success', 'maintenance' => 'badge-warning', default => 'badge-error' }; @endphp
-                            <span class="badge {{ $sb }}">{{ ucfirst($f->status) }}</span>
+                            <x-status-badge :status="$f->status" />
                         </td>
                         <td><a href="{{ url('/facilities/' . $f->id) }}" class="btn btn-secondary btn-sm">View</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center text-muted" style="padding: 2rem;">No facilities found.</td></tr>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted" style="padding: 2rem 1rem;">
+                            <p style="margin-bottom: .5rem;">No facilities found.</p>
+                            @if(request('search'))
+                                <a href="{{ url('/dashboard?section=facilities') }}" class="btn btn-secondary btn-sm">Clear Search</a>
+                            @endif
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>

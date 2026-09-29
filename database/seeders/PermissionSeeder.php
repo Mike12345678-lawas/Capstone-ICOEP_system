@@ -14,11 +14,13 @@ class PermissionSeeder extends Seeder
             // Facility
             ['name' => 'facility.view',    'description' => 'View facilities list'],
             ['name' => 'facility.reserve', 'description' => 'Submit facility reservation requests'],
-            ['name' => 'facility.manage',  'description' => 'Approve/reject facility reservations'],
+            ['name' => 'facility.manage',  'description' => 'Legacy — superseded by facility.approve'],
+            ['name' => 'facility.approve', 'description' => 'Approve/reject facility reservations (Admin only)'],
             // Equipment
             ['name' => 'equipment.view',   'description' => 'View equipment list'],
             ['name' => 'equipment.borrow', 'description' => 'Submit equipment borrow requests'],
-            ['name' => 'equipment.manage', 'description' => 'Manage equipment requests and inventory'],
+            ['name' => 'equipment.manage', 'description' => 'Manage equipment inventory (add/edit/delete)'],
+            ['name' => 'equipment.approve','description' => 'Approve/reject equipment requests (Admin only)'],
             // Events
             ['name' => 'event.view',       'description' => 'View events list'],
             ['name' => 'event.create',     'description' => 'Create new events'],
@@ -27,10 +29,12 @@ class PermissionSeeder extends Seeder
             ['name' => 'announcement.view',   'description' => 'View announcements'],
             ['name' => 'announcement.create', 'description' => 'Create new announcements'],
             ['name' => 'announcement.manage', 'description' => 'Manage all announcements'],
+            ['name' => 'announcement.delete', 'description' => 'Delete announcements'],
             // Users
             ['name' => 'user.view',   'description' => 'View user list'],
             ['name' => 'user.create', 'description' => 'Create new users'],
             ['name' => 'user.edit',   'description' => 'Edit user accounts'],
+            ['name' => 'user.delete', 'description' => 'Delete user accounts'],
             // Reports
             ['name' => 'report.view', 'description' => 'View system reports'],
             // Dashboard
@@ -45,10 +49,10 @@ class PermissionSeeder extends Seeder
         $rolePermissions = [
             'Administrator' => Permission::pluck('name')->toArray(), // All permissions
             'Staff' => [
-                'facility.view', 'facility.reserve', 'facility.manage',
+                'facility.view', 'facility.reserve',
                 'equipment.view', 'equipment.borrow', 'equipment.manage',
                 'event.view', 'event.create', 'event.manage',
-                'announcement.view', 'announcement.create', 'announcement.manage',
+                'announcement.view', 'announcement.create', 'announcement.manage', 'announcement.delete',
                 'dashboard.admin_stats',
             ],
             'Faculty' => [

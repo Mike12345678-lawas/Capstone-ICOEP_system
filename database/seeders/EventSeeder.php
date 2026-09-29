@@ -13,6 +13,7 @@ class EventSeeder extends Seeder
             [
                 'title'            => 'ICOEP System Launch Demo',
                 'description'      => 'Official launch demonstration of the Integrated Campus Operations and Engagement Portal. All students, faculty, and staff are invited to witness the unveiling of our new campus management system.',
+                'objectives'       => 'Demonstrate system features and onboard campus users.',
                 'event_type'       => 'academic',
                 'event_date'       => now()->addDays(14)->format('Y-m-d'),
                 'time_start'       => '09:00',
@@ -25,6 +26,7 @@ class EventSeeder extends Seeder
             [
                 'title'            => 'Intramurals 2024',
                 'description'      => 'Annual intramural sports competition. Events include basketball, volleyball, badminton, and table tennis. Teams from all departments are welcome to join.',
+                'objectives'       => 'Promote sportsmanship and department camaraderie.',
                 'event_type'       => 'sports',
                 'event_date'       => now()->addDays(30)->format('Y-m-d'),
                 'time_start'       => '07:00',
@@ -37,6 +39,7 @@ class EventSeeder extends Seeder
             [
                 'title'            => 'Tech Talk: AI in Education',
                 'description'      => 'A seminar exploring the impact and potential of Artificial Intelligence in modern education. Guest speaker from the industry will share insights and best practices.',
+                'objectives'       => 'Educate students and faculty on ethical AI tools and technologies.',
                 'event_type'       => 'academic',
                 'event_date'       => now()->addDays(7)->format('Y-m-d'),
                 'time_start'       => '13:00',
@@ -49,6 +52,7 @@ class EventSeeder extends Seeder
             [
                 'title'            => 'Campus Mass and Recollection',
                 'description'      => 'Monthly spiritual gathering for the campus community. All are welcome to attend the Holy Mass followed by a recollection and reflection activity.',
+                'objectives'       => 'Foster spiritual growth and community reflection.',
                 'event_type'       => 'spiritual',
                 'event_date'       => now()->addDays(5)->format('Y-m-d'),
                 'time_start'       => '08:00',

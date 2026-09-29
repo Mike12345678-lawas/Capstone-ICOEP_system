@@ -86,24 +86,24 @@ class User extends Authenticatable
 
     // ─── Permission Helpers ───
 
+    /** @var string[]|null Memoized permission names for the current request. */
+    private ?array $permissionCache = null;
+
     public function hasPermission(string $permissionName): bool
     {
-        return $this->role->permissions()->where('name', $permissionName)->exists();
+        if ($this->permissionCache === null) {
+            $this->permissionCache = $this->role
+                ->permissions()
+                ->pluck('name')
+                ->all();
+        }
+
+        return in_array($permissionName, $this->permissionCache, true);
     }
 
     public function hasRole(string $roleName): bool
     {
         return $this->role->name === $roleName;
-    }
-
-    public function isAdmin(): bool
-    {
-        return $this->hasRole('Administrator');
-    }
-
-    public function isStaff(): bool
-    {
-        return $this->hasRole('Staff');
     }
 
     public function isActive(): bool

@@ -42,19 +42,22 @@ class SendAutomatedReminders extends Command
             }
 
             // In-app Notification
+            $notificationLink = '/dashboard?section=facilities&reservation=' . $reservation->id;
+            
             $alreadyNotified = Notification::where('user_id', $user->id)
-                ->where('link', '/dashboard?section=facilities')
+                ->where('link', $notificationLink)
                 ->whereDate('created_at', now()->toDateString())
                 ->where('title', 'like', '%Upcoming%')
                 ->exists();
 
             if (!$alreadyNotified) {
+                $formattedTime = \Carbon\Carbon::parse($reservation->time_start)->format('h:i A');
                 Notification::send(
                     $user->id,
                     'Upcoming Reservation Reminder',
-                    "Just a reminder that your reservation for \"{$facility->name}\" is scheduled for tomorrow at {$reservation->start_time}.",
+                    "Just a reminder that your reservation for \"{$facility->name}\" is scheduled for tomorrow at {$formattedTime}.",
                     'info',
-                    '/dashboard?section=facilities'
+                    $notificationLink
                 );
             }
 

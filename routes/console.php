@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\CheckOverdueEquipment;
+use App\Console\Commands\ExpirePendingRequests;
 use App\Console\Commands\SendAutomatedReminders;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -32,3 +33,10 @@ Schedule::command(SendAutomatedReminders::class)
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/reservation_reminders.log'))
     ->description('Daily reminders for reservations happening tomorrow');
+
+// Daily expiry sweep — runs at midnight + 5 min to catch requests that expired overnight
+Schedule::command(ExpirePendingRequests::class)
+    ->dailyAt('00:05')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/expired_requests.log'))
+    ->description('Cancel pending requests whose date has already passed');

@@ -67,11 +67,7 @@ class FacilityController extends Controller
 
     /**
      * Reserve a facility — processed through the deterministic ResourceSolver.
-     * Auto-approves or auto-rejects based on:
-     *  1. Double-booking prevention (hard block)
-     *  2. Role-based priority (Admin > Faculty/Staff > Student)
-     *  3. FCFS within the same tier
-     *  4. Alternative suggestions on rejection
+     * Flow is pending + manual approval, or config-driven auto-approval.
      */
     public function reserve(Request $request, Facility $facility)
     {
@@ -92,50 +88,125 @@ class FacilityController extends Controller
                 ->lockForUpdate()
                 ->get();
 
-            return ResourceSolver::resolveFacilityReservation(
+            $solverResult = ResourceSolver::resolveFacilityReservation(
                 $facility,
                 $request->reservation_date,
                 $request->time_start,
                 $request->time_end,
                 $user
             );
+
+            if ($solverResult['status'] === 'rejected') {
+                return $solverResult;
+            }
+
+            // ─── Create the reservation with pending status (inside the lock) ───
+            $reservation = FacilityReservation::create([
+                'facility_id'      => $facility->id,
+                'user_id'          => $user->id,
+                'title'            => $request->title,
+                'description'      => $request->description,
+                'reservation_date' => $request->reservation_date,
+                'time_start'       => $request->time_start,
+                'time_end'         => $request->time_end,
+                'status'           => 'pending',
+                'remarks'          => 'Pending admin approval',
+                'approved_by'      => null,
+            ]);
+
+            AuditLog::log('CREATE_RESERVATION', 'facility_reservations', $reservation->id);
+
+            return array_merge($solverResult, ['reservation' => $reservation]);
         });
 
         if ($result['status'] === 'rejected') {
-            $errorMsg = $result['reason'];
-
-            // Format suggestions if available
+            $suggestions = [];
             if (!empty($result['suggestions'])) {
-                $errorMsg .= ' | Alternatives: ';
-                $alts = [];
                 foreach (array_slice($result['suggestions'], 0, 3) as $s) {
-                    if ($s['type'] === 'time_slot' || $s['type'] === 'alternate_date') {
-                        $alts[] = "{$s['date']} {$s['start']}–{$s['end']}";
-                    } elseif ($s['type'] === 'alternate_facility') {
-                        $alts[] = "{$s['name']} ({$s['location']})";
+                    if (($s['type'] ?? '') === 'time_slot' || ($s['type'] ?? '') === 'alternate_date') {
+                        $suggestions[] = [
+                            'type'  => $s['type'],
+                            'label' => "{$s['date']} {$s['start']}–{$s['end']}",
+                            'date'  => $s['date'] ?? null,
+                            'start' => $s['start'] ?? null,
+                            'end'   => $s['end'] ?? null,
+                        ];
+                    } elseif (($s['type'] ?? '') === 'alternate_facility') {
+                        $suggestions[] = [
+                            'type'        => 'alternate_facility',
+                            'label'       => "{$s['name']} ({$s['location']})",
+                            'facility_id' => $s['facility_id'] ?? $s['id'] ?? null,
+                            'name'        => $s['name'] ?? null,
+                        ];
                     }
                 }
-                $errorMsg .= implode('; ', $alts);
             }
 
-            return back()->withInput()->with('error', $errorMsg);
+            return back()->withInput()
+                ->with('error', $result['reason'])
+                ->with('suggestions', $suggestions);
         }
 
-        // ─── Create the reservation with pending status ───
-        $reservation = FacilityReservation::create([
-            'facility_id'      => $facility->id,
-            'user_id'          => Auth::id(),
-            'title'            => $request->title,
-            'description'      => $request->description,
-            'reservation_date' => $request->reservation_date,
-            'time_start'       => $request->time_start,
-            'time_end'         => $request->time_end,
-            'status'           => 'pending',
-            'remarks'          => 'Pending admin approval',
-            'approved_by'      => null, // requires admin approval
-        ]);
+        $reservation = $result['reservation'];
 
-        AuditLog::log('CREATE_RESERVATION', 'facility_reservations', $reservation->id);
+        // ─── Optional rule-based auto-approval ───────────────────────────
+        $autoCfg = config('icoep.auto_approve.facility', []);
+        if (!empty($autoCfg['enabled'])) {
+            $roleName      = $user->role->name ?? '';
+            $allowedRoles  = $autoCfg['allowed_roles'] ?? [];
+            $opStart       = $autoCfg['operating_start'] ?? '00:00';
+            $opEnd         = $autoCfg['operating_end']   ?? '23:59';
+            $maxHours      = (int) ($autoCfg['max_duration_hours'] ?? 0);
+
+            $requestStart  = \Carbon\Carbon::parse($request->time_start);
+            $requestEnd    = \Carbon\Carbon::parse($request->time_end);
+            $durationHours = $requestStart->diffInMinutes($requestEnd) / 60;
+
+            $withinHours  = $requestStart->format('H:i') >= $opStart && $requestEnd->format('H:i') <= $opEnd;
+            $withinDur    = $maxHours === 0 || $durationHours <= $maxHours;
+            $roleAllowed  = in_array($roleName, $allowedRoles, true);
+
+            if ($roleAllowed && $withinHours && $withinDur && $result['status'] === 'approved') {
+                // Re-check inside a lock — no approved conflicts must exist
+                $autoApproved = DB::transaction(function () use ($reservation) {
+                    $locked    = FacilityReservation::lockForUpdate()->find($reservation->id);
+                    $conflicts = FacilityReservation::conflicts(
+                        $locked->facility_id,
+                        $locked->reservation_date->toDateString(),
+                        $locked->time_start,
+                        $locked->time_end
+                    )->where('status', 'approved')->where('id', '!=', $locked->id)->count();
+
+                    if ($conflicts > 0) {
+                        return false;
+                    }
+
+                    $locked->update([
+                        'status'      => 'approved',
+                        'remarks'     => 'Auto-approved by system rule.',
+                        'approved_by' => null,
+                    ]);
+                    return true;
+                });
+
+                if ($autoApproved) {
+                    $reservation->refresh();
+                    AuditLog::log('AUTO_APPROVED_RESERVATION', 'facility_reservations', $reservation->id);
+
+                    Notification::send(
+                        $user->id,
+                        '✅ Reservation Approved',
+                        "Your reservation for \"{$facility->name}\" on {$reservation->reservation_date->format('M d, Y')} ({$request->time_start}–{$request->time_end}) was automatically approved.",
+                        'success',
+                        '/facilities/' . $facility->id
+                    );
+
+                    return redirect('/facilities/' . $facility->id)
+                        ->with('success', 'Reservation automatically approved — no conflicts found.');
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         Notification::send(
             $user->id,
@@ -188,10 +259,10 @@ class FacilityController extends Controller
             ->paginate(config('icoep.items_per_page'));
 
         return view('facilities.manage', [
-            'pageTitle'    => 'Manage Facility Bookings',
+            'pageTitle'    => 'Booking Requests',
             'breadcrumb'   => [
                 ['label' => 'Dashboard', 'url' => '/dashboard'],
-                ['label' => 'Manage Bookings'],
+                ['label' => 'Booking Requests'],
             ],
             'reservations' => $reservations,
             'statusFilter' => $status ?? 'pending',
@@ -206,37 +277,164 @@ class FacilityController extends Controller
             'remarks' => 'nullable|string|max:500',
         ]);
 
-        // Double-booking prevention on manual approval
-        if ($request->status === 'approved') {
-            $conflicts = FacilityReservation::conflicts(
-                $reservation->facility_id,
-                $reservation->reservation_date->toDateString(),
-                $reservation->time_start,
-                $reservation->time_end
-            )->where('id', '!=', $reservation->id)->count();
+        // ─── Allowed state transitions ───
+        $allowedTransitions = [
+            'pending'  => ['approved', 'rejected', 'cancelled'],
+            'approved' => ['cancelled'],
+        ];
 
-            if ($conflicts > 0) {
-                return back()->with('error', 'Cannot approve: time slot conflicts with an existing approved reservation.');
-            }
+        $currentStatus = $reservation->status;
+        $allowed = $allowedTransitions[$currentStatus] ?? [];
+
+        if (!in_array($request->status, $allowed)) {
+            return back()->with('error', "Cannot change status from '{$currentStatus}' to '{$request->status}'.");
         }
 
-        $reservation->update([
-            'status'      => $request->status,
-            'remarks'     => $request->remarks,
-            'approved_by' => Auth::id(),
-        ]);
+        // Block approving a reservation whose date is already past
+        if ($request->status === 'approved' && $reservation->reservation_date->lt(now()->startOfDay())) {
+            return back()->with('error', 'Cannot approve a reservation whose date has already passed.');
+        }
+
+        // Wrap conflict check + update in a transaction with row lock
+        $conflictError = DB::transaction(function () use ($reservation, $request) {
+            // Re-fetch with lock to prevent concurrent approval races
+            $lockedReservation = FacilityReservation::lockForUpdate()->find($reservation->id);
+
+            // Double-booking prevention on manual approval
+            if ($request->status === 'approved') {
+                $conflicts = FacilityReservation::conflicts(
+                    $lockedReservation->facility_id,
+                    $lockedReservation->reservation_date->toDateString(),
+                    $lockedReservation->time_start,
+                    $lockedReservation->time_end
+                )->where('id', '!=', $lockedReservation->id)->count();
+
+                if ($conflicts > 0) {
+                    return 'Cannot approve: time slot conflicts with an existing approved reservation.';
+                }
+            }
+
+            $lockedReservation->update([
+                'status'      => $request->status,
+                'remarks'     => $request->remarks,
+                'approved_by' => Auth::id(),
+            ]);
+
+            return null;
+        });
+
+        if ($conflictError) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => $conflictError], 422);
+            }
+            return back()->with('error', $conflictError);
+        }
 
         AuditLog::log(strtoupper($request->status) . '_RESERVATION', 'facility_reservations', $reservation->id);
 
         $statusLabel = ucfirst($request->status);
+        $remarkText  = '';
+        if ($request->status === 'rejected' && $request->filled('remarks')) {
+            $remarkText = ' Reason: ' . $request->remarks;
+        }
         Notification::send(
             $reservation->user_id,
             "Reservation {$statusLabel}",
-            "Your reservation for \"{$reservation->facility->name}\" on {$reservation->reservation_date->format('M d, Y')} has been {$request->status}.",
+            "Your reservation for \"{$reservation->facility->name}\" on {$reservation->reservation_date->format('M d, Y')} has been {$request->status}.{$remarkText}",
             $request->status === 'approved' ? 'success' : ($request->status === 'rejected' ? 'error' : 'warning'),
             '/facilities/' . $reservation->facility_id
         );
 
+        if ($request->expectsJson()) {
+            $reservation->refresh();
+            return response()->json(['success' => true, 'status' => $reservation->status]);
+        }
         return back()->with('success', "Reservation {$request->status} successfully.");
+    }
+
+    // ─── Bulk Approve ───
+
+    public function bulkApprove(Request $request)
+    {
+        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer']);
+
+        $succeeded = 0;
+        $failures  = [];
+
+        foreach ($request->ids as $id) {
+            $reservation = FacilityReservation::find($id);
+            if (!$reservation || $reservation->status !== 'pending') {
+                $failures[] = "#{$id}: not found or not pending";
+                continue;
+            }
+            if ($reservation->reservation_date->lt(now()->startOfDay())) {
+                $failures[] = "#{$id}: date already passed";
+                continue;
+            }
+
+            $conflictError = DB::transaction(function () use ($reservation) {
+                $locked = FacilityReservation::lockForUpdate()->find($reservation->id);
+                $conflicts = FacilityReservation::conflicts(
+                    $locked->facility_id,
+                    $locked->reservation_date->toDateString(),
+                    $locked->time_start,
+                    $locked->time_end
+                )->where('id', '!=', $locked->id)->count();
+                if ($conflicts > 0) {
+                    return 'conflicts with an existing approved reservation';
+                }
+                $locked->update(['status' => 'approved', 'approved_by' => Auth::id()]);
+                return null;
+            });
+
+            if ($conflictError) {
+                $failures[] = "#{$id}: {$conflictError}";
+                continue;
+            }
+
+            AuditLog::log('APPROVED_RESERVATION', 'facility_reservations', $reservation->id);
+            Notification::send(
+                $reservation->user_id,
+                'Reservation Approved',
+                "Your reservation for \"{$reservation->facility->name}\" on {$reservation->reservation_date->format('M d, Y')} has been approved.",
+                'success',
+                '/facilities/' . $reservation->facility_id
+            );
+            $succeeded++;
+        }
+
+        $msg = "{$succeeded} approved";
+        if ($failures) {
+            $msg .= '; ' . count($failures) . ' failed: ' . implode(', ', $failures);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => $succeeded, 'failures' => $failures, 'message' => $msg]);
+        }
+        return back()->with($failures ? 'error' : 'success', $msg);
+    }
+
+    // ─── User Cancel Own Pending Reservation ───
+
+    public function cancelOwn(Request $request, FacilityReservation $reservation)
+    {
+        if ($reservation->user_id !== Auth::id()) {
+            abort(403);
+        }
+        if ($reservation->status !== 'pending') {
+            $msg = 'Only pending reservations can be cancelled.';
+            if ($request->expectsJson()) {
+                return response()->json(['error' => $msg], 422);
+            }
+            return back()->with('error', $msg);
+        }
+
+        $reservation->update(['status' => 'cancelled', 'remarks' => 'Cancelled by requester']);
+        AuditLog::log('CANCELLED_RESERVATION', 'facility_reservations', $reservation->id);
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'status' => 'cancelled']);
+        }
+        return back()->with('success', 'Reservation cancelled.');
     }
 }

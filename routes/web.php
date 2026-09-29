@@ -57,6 +57,7 @@ Route::middleware('auth')->group(function () {
 
     // ─── Detail/Show routes (still separate pages) ───
     Route::get('/facilities/{facility}', [FacilityController::class, 'show'])->middleware('permission:facility.view');
+    Route::get('/equipment/create', [EquipmentController::class, 'create'])->middleware('permission:equipment.manage');
     Route::get('/equipment/{equipment}', [EquipmentController::class, 'show'])->middleware('permission:equipment.view');
     Route::get('/events/my', [EventController::class, 'myEvents'])->middleware('permission:event.view');
     Route::get('/events/create', [EventController::class, 'create'])->middleware('permission:event.create');
@@ -71,13 +72,16 @@ Route::middleware('auth')->group(function () {
 
     // ─── Action routes (POST/PUT/PATCH/DELETE) ───
     Route::post('/facilities/{facility}/reserve', [FacilityController::class, 'reserve'])->middleware('permission:facility.reserve');
-    Route::patch('/facility-reservations/{reservation}/status', [FacilityController::class, 'updateStatus'])->middleware('permission:facility.manage');
+    Route::patch('/facility-reservations/{reservation}/status', [FacilityController::class, 'updateStatus'])->middleware('permission:facility.approve');
+    Route::post('/facility-reservations/bulk-approve', [FacilityController::class, 'bulkApprove'])->middleware('permission:facility.approve');
+    Route::patch('/facility-reservations/{reservation}/cancel', [FacilityController::class, 'cancelOwn']);
 
     Route::post('/equipment/{equipment}/borrow', [EquipmentController::class, 'borrow'])->middleware('permission:equipment.borrow');
-    Route::patch('/equipment-requests/{equipmentRequest}/status', [EquipmentController::class, 'updateStatus'])->middleware('permission:equipment.manage');
+    Route::patch('/equipment-requests/{equipmentRequest}/status', [EquipmentController::class, 'updateStatus'])->middleware('permission:equipment.approve');
+    Route::post('/equipment-requests/bulk-approve', [EquipmentController::class, 'bulkApprove'])->middleware('permission:equipment.approve');
+    Route::patch('/equipment-requests/{equipmentRequest}/cancel', [EquipmentController::class, 'cancelOwn']);
 
     // ─── Equipment Inventory CRUD (Admin) ───
-    Route::get('/equipment/create', [EquipmentController::class, 'create'])->middleware('permission:equipment.manage');
     Route::post('/equipment', [EquipmentController::class, 'store'])->middleware('permission:equipment.manage');
     Route::get('/equipment/{equipment}/edit', [EquipmentController::class, 'edit'])->middleware('permission:equipment.manage');
     Route::put('/equipment/{equipment}', [EquipmentController::class, 'update'])->middleware('permission:equipment.manage');
@@ -96,11 +100,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/events/{event}/manual-checkin', [EventController::class, 'manualCheckin'])->middleware('permission:event.manage');
 
     Route::post('/announcements', [AnnouncementController::class, 'store'])->middleware('permission:announcement.create');
-    Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->middleware('permission:announcement.create');
+    Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->middleware('permission:announcement.delete');
 
     Route::post('/users', [UserController::class, 'store'])->middleware('permission:user.create');
     Route::put('/users/{user}', [UserController::class, 'update']);
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:user.edit');
+    Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:user.delete');
 
     // ─── Notifications API ───
     Route::get('/api/notifications', [NotificationController::class, 'getUnread']);

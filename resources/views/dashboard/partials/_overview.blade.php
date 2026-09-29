@@ -5,6 +5,46 @@
     </div>
 </div>
 
+@if(isset($needsActionBookings) || isset($needsActionEquipment))
+<div class="card animate-fade-in-up" style="animation-delay: 50ms; border-left: 4px solid #f59e0b;">
+    <div class="card-header" style="background: rgba(245,158,11,.06);">
+        <h3 class="card-title" style="color:#b45309;">⚡ Needs Your Action</h3>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div class="grid grid-2" style="gap:0;">
+            <div style="padding:1rem;border-right:1px solid var(--color-border,#e2e8f0);">
+                <p style="font-weight:700;font-size:.85rem;margin:0 0 .5rem;">Pending Facility Bookings</p>
+                @forelse(($needsActionBookings ?? collect()) as $r)
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
+                    <span>{{ $r->user->full_name }} — <strong>{{ $r->facility->name }}</strong> ({{ $r->reservation_date->format('M d') }})</span>
+                    <a href="{{ url('/dashboard?section=manage-bookings&status=pending') }}" class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Review</a>
+                </div>
+                @empty
+                <p class="text-muted" style="font-size:.85rem;margin:0;">None pending.</p>
+                @endforelse
+                @if(($needsActionBookings ?? collect())->count() >= 5)
+                <a href="{{ url('/dashboard?section=manage-bookings&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);">View all →</a>
+                @endif
+            </div>
+            <div style="padding:1rem;">
+                <p style="font-weight:700;font-size:.85rem;margin:0 0 .5rem;">Pending Equipment Requests</p>
+                @forelse(($needsActionEquipment ?? collect()) as $r)
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
+                    <span>{{ $r->user->full_name }} — <strong>{{ $r->equipment->name }}</strong> ×{{ $r->quantity }}</span>
+                    <a href="{{ url('/dashboard?section=manage-equipment&status=pending') }}" class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Review</a>
+                </div>
+                @empty
+                <p class="text-muted" style="font-size:.85rem;margin:0;">None pending.</p>
+                @endforelse
+                @if(($needsActionEquipment ?? collect())->count() >= 5)
+                <a href="{{ url('/dashboard?section=manage-equipment&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);">View all →</a>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 @if(isset($stats))
 <div class="grid grid-4 animate-fade-in-up" style="animation-delay: 100ms;">
     <div class="stat-card">
@@ -21,8 +61,10 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
         </div>
         <div class="stat-content">
-            <span class="stat-value">{{ $stats['pending_reservations'] }}</span>
-            <span class="stat-label">Pending Bookings</span>
+            <a href="{{ url('/dashboard?section=manage-bookings&status=pending') }}" style="text-decoration:none;color:inherit;">
+                <span class="stat-value">{{ $stats['pending_reservations'] }}</span>
+                <span class="stat-label">Pending Bookings</span>
+            </a>
         </div>
     </div>
     <div class="stat-card">
@@ -30,8 +72,10 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
         </div>
         <div class="stat-content">
-            <span class="stat-value">{{ $stats['pending_borrows'] }}</span>
-            <span class="stat-label">Pending Equipment</span>
+            <a href="{{ url('/dashboard?section=manage-equipment&status=pending') }}" style="text-decoration:none;color:inherit;">
+                <span class="stat-value">{{ $stats['pending_borrows'] }}</span>
+                <span class="stat-label">Pending Equipment</span>
+            </a>
         </div>
     </div>
     <div class="stat-card">
@@ -55,19 +99,32 @@
         </div>
         <div class="card-body" style="padding: 0;">
             <table class="data-table">
-                <thead><tr><th>Facility</th><th>Date</th><th>Status</th></tr></thead>
+                <thead><tr><th>Facility</th><th>Date</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                 @forelse($myReservations as $res)
                     <tr>
                         <td style="font-weight: 600;">{{ $res->facility->name }}</td>
                         <td>{{ $res->reservation_date->format('M d, Y') }}</td>
                         <td>
-                            @php $sb = match($res->status) { 'approved' => 'badge-success', 'rejected','cancelled' => 'badge-error', default => 'badge-warning' }; @endphp
-                            <span class="badge {{ $sb }}">{{ ucfirst($res->status) }}</span>
+                            <x-status-badge :status="$res->status" />
+                        </td>
+                        <td>
+                            @if($res->status === 'pending')
+                                <form method="POST" action="{{ url('/facility-reservations/' . $res->id . '/cancel') }}" style="margin:0;">
+                                    @csrf @method('PATCH')
+                                    <button class="btn btn-secondary btn-sm" style="font-size:.75rem;"
+                                        onclick="return confirm('Cancel this reservation?')">Cancel</button>
+                                </form>
+                            @endif
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="text-center text-muted" style="padding: 1.5rem;">No reservations yet.</td></tr>
+                    <tr>
+                        <td colspan="4" class="text-center text-muted" style="padding: 2rem 1rem;">
+                            <p style="margin-bottom: .5rem;">No reservations yet.</p>
+                            <a href="{{ url('/facilities') }}" class="btn btn-secondary btn-sm">Browse Facilities</a>
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>
@@ -82,19 +139,32 @@
         </div>
         <div class="card-body" style="padding: 0;">
             <table class="data-table">
-                <thead><tr><th>Equipment</th><th>Qty</th><th>Status</th></tr></thead>
+                <thead><tr><th>Equipment</th><th>Qty</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                 @forelse($myBorrows as $borrow)
                     <tr>
                         <td style="font-weight: 600;">{{ $borrow->equipment->name }}</td>
                         <td>{{ $borrow->quantity }}</td>
                         <td>
-                            @php $sb = match($borrow->status) { 'approved','returned' => 'badge-success', 'rejected','cancelled' => 'badge-error', 'borrowed' => 'badge-general', default => 'badge-warning' }; @endphp
-                            <span class="badge {{ $sb }}">{{ ucfirst($borrow->status) }}</span>
+                            <x-status-badge :status="$borrow->status" />
+                        </td>
+                        <td>
+                            @if($borrow->status === 'pending')
+                                <form method="POST" action="{{ url('/equipment-requests/' . $borrow->id . '/cancel') }}" style="margin:0;">
+                                    @csrf @method('PATCH')
+                                    <button class="btn btn-secondary btn-sm" style="font-size:.75rem;"
+                                        onclick="return confirm('Cancel this request?')">Cancel</button>
+                                </form>
+                            @endif
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="text-center text-muted" style="padding: 1.5rem;">No equipment requests yet.</td></tr>
+                    <tr>
+                        <td colspan="4" class="text-center text-muted" style="padding: 2rem 1rem;">
+                            <p style="margin-bottom: .5rem;">No equipment requests yet.</p>
+                            <a href="{{ url('/equipment') }}" class="btn btn-secondary btn-sm">Browse Equipment</a>
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>

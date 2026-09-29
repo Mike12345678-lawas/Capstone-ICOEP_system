@@ -93,6 +93,19 @@ class DashboardController extends Controller
             ->latest()
             ->limit(5)
             ->get();
+
+        if ($user->hasPermission('facility.approve')) {
+            $data['needsActionBookings'] = FacilityReservation::with(['facility', 'user'])
+                ->pending()
+                ->orderBy('reservation_date')
+                ->limit(5)
+                ->get();
+            $data['needsActionEquipment'] = EquipmentRequest::with(['equipment', 'user'])
+                ->pending()
+                ->orderBy('date_needed')
+                ->limit(5)
+                ->get();
+        }
     }
 
     // ─── FACILITIES ──────────────────────────────────────────────────────
@@ -229,7 +242,7 @@ class DashboardController extends Controller
     protected function loadManageBookings(array &$data, Request $request): void
     {
         $user = Auth::user();
-        if (!$user->hasPermission('facility.manage')) {
+        if (!$user->hasPermission('facility.approve')) {
             abort(403);
         }
 
@@ -246,8 +259,44 @@ class DashboardController extends Controller
             $query->where('status', $status);
         }
 
-        $data['reservations'] = $query->latest()->paginate(15);
+        // Sort: pending rows soonest-first; otherwise latest
+        $isPendingFilter = ($status === 'pending' || $status === '');
+        if ($isPendingFilter) {
+            $query->orderBy('reservation_date')->orderBy('time_start');
+        } else {
+            $query->latest();
+        }
+
+        $reservations = $query->paginate(15);
+        $data['reservations'] = $reservations;
         $data['statusFilter'] = $status;
+
+        // Conflict map: for each pending reservation, check against approved ones (one batch query)
+        $pendingIds    = $reservations->where('status', 'pending')->pluck('id')->toArray();
+        $conflictMap   = [];
+        if (!empty($pendingIds)) {
+            // Load all approved reservations for the same facilities on the same dates
+            $facilityIds = $reservations->where('status', 'pending')->pluck('facility_id')->unique()->toArray();
+            $dates       = $reservations->where('status', 'pending')->pluck('reservation_date')->map(fn($d) => $d->toDateString())->unique()->toArray();
+            $approved    = FacilityReservation::whereIn('facility_id', $facilityIds)
+                ->whereIn(DB::raw('DATE(reservation_date)'), $dates)
+                ->where('status', 'approved')
+                ->with('user')
+                ->get();
+
+            foreach ($reservations->where('status', 'pending') as $res) {
+                $conflict = $approved->first(function ($a) use ($res) {
+                    return $a->facility_id === $res->facility_id
+                        && $a->reservation_date->toDateString() === $res->reservation_date->toDateString()
+                        && $a->time_start < $res->time_end
+                        && $a->time_end   > $res->time_start;
+                });
+                $conflictMap[$res->id] = $conflict
+                    ? 'Overlaps with ' . $conflict->user->full_name . ' (' . $conflict->title . ')'
+                    : 'No conflict';
+            }
+        }
+        $data['conflictMap'] = $conflictMap;
     }
 
     // ─── MANAGE EQUIPMENT (Admin/Staff) ──────────────────────────────────
@@ -255,7 +304,7 @@ class DashboardController extends Controller
     protected function loadManageEquipment(array &$data, Request $request): void
     {
         $user = Auth::user();
-        if (!$user->hasPermission('equipment.manage')) {
+        if (!$user->hasPermission('equipment.approve')) {
             abort(403);
         }
 
@@ -272,8 +321,26 @@ class DashboardController extends Controller
             $query->where('status', $status);
         }
 
-        $data['equipmentRequests'] = $query->latest()->paginate(15);
+        // Sort: pending rows soonest-first; otherwise latest
+        $isPendingFilter = ($status === 'pending' || $status === '');
+        if ($isPendingFilter) {
+            $query->orderBy('date_needed');
+        } else {
+            $query->latest();
+        }
+
+        $eqRequests = $query->paginate(15);
+        $data['equipmentRequests'] = $eqRequests;
         $data['statusFilter']      = $status;
+
+        // Stock badge: for each pending row, check if available_quantity < requested quantity
+        $stockMap = [];
+        foreach ($eqRequests->where('status', 'pending') as $req) {
+            $avail = $req->equipment->available_quantity ?? 0;
+            $shortfall = $req->quantity - $avail;
+            $stockMap[$req->id] = $shortfall > 0 ? "Short by {$shortfall}" : 'Stock OK';
+        }
+        $data['stockMap'] = $stockMap;
     }
 
     // ─── REPORTS (Admin) ─────────────────────────────────────────────────

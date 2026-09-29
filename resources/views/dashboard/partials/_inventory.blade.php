@@ -1,7 +1,7 @@
 <div class="page-header animate-fade-in-up">
     <div>
         <h1 class="page-title">Equipment Inventory</h1>
-        <p class="page-subtitle">Manage equipment items — add, edit, and track inventory status.</p>
+        <p class="page-subtitle">Manage stock levels, add new items, and track overall equipment inventory.</p>
     </div>
     <a href="{{ url('/equipment/create') }}" class="btn btn-primary">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -42,8 +42,7 @@
                         </td>
                         <td>{{ $borrowed > 0 ? $borrowed : '—' }}</td>
                         <td>
-                            @php $sb = match($item->status) { 'available' => 'badge-success', 'maintenance' => 'badge-warning', 'retired' => 'badge-error', default => 'badge-general' }; @endphp
-                            <span class="badge {{ $sb }}">{{ ucfirst($item->status) }}</span>
+                            <x-status-badge :status="$item->status" />
                         </td>
                         <td>
                             <div class="btn-group">
@@ -56,7 +55,16 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted" style="padding: 2rem;">No equipment items found.</td></tr>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted" style="padding: 2rem 1rem;">
+                            <p style="margin-bottom: .5rem;">No equipment items found.</p>
+                            @if(request('search') || request('category'))
+                                <a href="{{ url('/dashboard?section=inventory') }}" class="btn btn-secondary btn-sm">Clear Filters</a>
+                            @else
+                                <a href="{{ url('/equipment/create') }}" class="btn btn-primary btn-sm">Add Equipment</a>
+                            @endif
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>

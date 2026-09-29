@@ -63,50 +63,23 @@ class ResourceSolver
             ];
         }
 
-        // Rule 3: Check for double-booking (hard block)
-        $conflicts = FacilityReservation::conflicts($facility->id, $date, $timeStart, $timeEnd)->get();
+        // Rule 3: Check for double-booking against approved reservations (hard block)
+        $conflicts = FacilityReservation::conflicts($facility->id, $date, $timeStart, $timeEnd)
+            ->where('status', 'approved')
+            ->get();
 
         if ($conflicts->isEmpty()) {
-            // No conflicts — auto-approve (FCFS: first valid request wins)
+            // No approved conflicts — eligible for approval
             return [
                 'status' => 'approved',
-                'reason' => 'Auto-approved: no scheduling conflicts detected (FCFS).',
+                'reason' => 'No scheduling conflicts detected.',
             ];
         }
 
-        // Rule 4: Priority-based preemption check
-        $requesterPriority = self::getUserPriority($requester);
-
-        // Check if ALL conflicting reservations have lower priority
-        $canPreempt = true;
-        $preemptTargets = [];
-
-        foreach ($conflicts as $conflict) {
-            $conflictPriority = self::getUserPriority($conflict->user);
-
-            if ($requesterPriority < $conflictPriority) {
-                // Requester has higher priority — mark conflict for preemption
-                $preemptTargets[] = $conflict;
-            } else {
-                // Equal or lower priority — cannot preempt
-                $canPreempt = false;
-                break;
-            }
-        }
-
-        if ($canPreempt && !empty($preemptTargets)) {
-            // Higher-priority user bumps lower-priority bookings
-            return [
-                'status'          => 'approved',
-                'reason'          => 'Auto-approved: higher role-priority preempts existing booking(s).',
-                'preempt_targets' => $preemptTargets,
-            ];
-        }
-
-        // Rule 5: Rejected — suggest alternatives
+        // Conflict exists with an approved booking — always reject, never preempt
         return [
             'status'      => 'rejected',
-            'reason'      => 'Time slot conflict: the facility is already reserved during this period by a same-or-higher priority user.',
+            'reason'      => 'Time slot conflict: the facility is already reserved during this period.',
             'suggestions' => AlternativeSuggester::suggestAlternateTimeSlots($facility, $date, $timeStart, $timeEnd),
         ];
     }
@@ -166,7 +139,7 @@ class ResourceSolver
 
         // Rule 3: Check for overlapping date conflicts (same equipment, same date range)
         $dateConflicts = EquipmentRequest::where('equipment_id', $equipment->id)
-            ->whereIn('status', ['pending', 'approved', 'borrowed'])
+            ->whereIn('status', ['approved', 'borrowed'])
             ->where('date_needed', '<=', $expectedReturn)
             ->where('expected_return_date', '>=', $dateNeeded)
             ->sum('quantity');
@@ -174,39 +147,6 @@ class ResourceSolver
         $totalDemand = $dateConflicts + $quantity;
 
         if ($totalDemand > $equipment->quantity) {
-            // Priority check: can this user preempt lower-priority requests?
-            $requesterPriority = self::getUserPriority($requester);
-
-            $conflictingRequests = EquipmentRequest::with('user')
-                ->where('equipment_id', $equipment->id)
-                ->whereIn('status', ['pending', 'approved'])
-                ->where('date_needed', '<=', $expectedReturn)
-                ->where('expected_return_date', '>=', $dateNeeded)
-                ->orderByDesc('created_at')
-                ->get();
-
-            $freedQuantity = 0;
-            $preemptTargets = [];
-
-            foreach ($conflictingRequests as $cr) {
-                $crPriority = self::getUserPriority($cr->user);
-                if ($requesterPriority < $crPriority) {
-                    $freedQuantity += $cr->quantity;
-                    $preemptTargets[] = $cr;
-                    if ($equipment->available_quantity + $freedQuantity >= $quantity) {
-                        break;
-                    }
-                }
-            }
-
-            if ($equipment->available_quantity + $freedQuantity >= $quantity && !empty($preemptTargets)) {
-                return [
-                    'status'          => 'approved',
-                    'reason'          => 'Auto-approved: higher role-priority preempts lower-priority request(s).',
-                    'preempt_targets' => $preemptTargets,
-                ];
-            }
-
             return [
                 'status'      => 'rejected',
                 'reason'      => "Projected demand ({$totalDemand}) exceeds total inventory ({$equipment->quantity}) for the requested period.",
@@ -214,10 +154,10 @@ class ResourceSolver
             ];
         }
 
-        // All clear — auto-approve (FCFS)
+        // All clear — eligible for approval
         return [
             'status' => 'approved',
-            'reason' => 'Auto-approved: sufficient quantity available, no conflicts (FCFS).',
+            'reason' => 'Sufficient quantity available, no conflicts.',
         ];
     }
 

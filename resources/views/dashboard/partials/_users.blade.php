@@ -39,8 +39,7 @@
                         <td><span class="badge badge-general">{{ $u->role->name }}</span></td>
                         <td>{{ $u->department?->name ?: '—' }}</td>
                         <td>
-                            @php $sb = match($u->status) { 'active' => 'badge-success', 'locked' => 'badge-error', default => 'badge-warning' }; @endphp
-                            <span class="badge {{ $sb }}">{{ ucfirst($u->status) }}</span>
+                            <x-status-badge :status="$u->status" />
                         </td>
                         <td>
                             <div class="btn-group">
@@ -55,7 +54,16 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted" style="padding: 2rem;">No users found.</td></tr>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted" style="padding: 2rem 1rem;">
+                            <p style="margin-bottom: .5rem;">No users found.</p>
+                            @if(request('search') || request('role'))
+                                <a href="{{ url('/dashboard?section=users') }}" class="btn btn-secondary btn-sm">Clear Filters</a>
+                            @else
+                                <a href="{{ url('/users/create') }}" class="btn btn-primary btn-sm">Create User</a>
+                            @endif
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>

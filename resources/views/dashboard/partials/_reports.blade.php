@@ -1,3 +1,7 @@
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+@endpush
+
 <div class="page-header animate-fade-in-up">
     <div>
         <h1 class="page-title">Reports</h1>
@@ -20,44 +24,44 @@
 <div class="card animate-fade-in-up" style="animation-delay: 100ms; margin-top: 1rem;">
     <div class="card-header"><h3 class="card-title">Facility Usage Report</h3></div>
     <div class="card-body">
-        <form method="GET" action="{{ url('/dashboard') }}" class="search-bar" style="margin-bottom: 1rem;">
+        <form method="GET" action="{{ url('/dashboard') }}" class="search-bar report-filter-bar">
             <input type="hidden" name="section" value="reports">
             <input type="hidden" name="report" value="facility-usage">
-            <div class="form-group" style="margin-bottom: 0;">
-                <input type="date" name="from" class="form-control" value="{{ $dateFrom ?? '' }}" style="max-width: 180px;">
+            <div class="form-group mb-0">
+                <input type="date" name="from" class="form-control report-date-input" value="{{ $dateFrom ?? '' }}">
             </div>
             <span class="text-muted">to</span>
-            <div class="form-group" style="margin-bottom: 0;">
-                <input type="date" name="to" class="form-control" value="{{ $dateTo ?? '' }}" style="max-width: 180px;">
+            <div class="form-group mb-0">
+                <input type="date" name="to" class="form-control report-date-input" value="{{ $dateTo ?? '' }}">
             </div>
             <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
         </form>
 
-        <div style="position: relative; height: 300px; width: 100%; margin-bottom: 2rem;">
+        <div class="report-chart-container">
             <canvas id="facilityUsageChart"></canvas>
         </div>
 
         <div class="table-responsive">
             <table class="data-table">
-                <thead><tr><th>Facility</th><th>Total Reservations</th><th>Approved</th><th>Usage Rate</th></tr></thead>
+                <thead><tr><th scope="col">Facility</th><th scope="col">Total Reservations</th><th scope="col">Approved</th><th scope="col">Usage Rate</th></tr></thead>
                 <tbody>
                 @forelse($facilityStats ?? [] as $stat)
                     @php $pct = $stat->total > 0 ? round(($stat->approved / $stat->total) * 100) : 0; @endphp
                     <tr>
-                        <td style="font-weight: 600;">{{ $stat->facility->name ?? '—' }}</td>
+                        <td class="font-semibold">{{ $stat->facility->name ?? '—' }}</td>
                         <td>{{ $stat->total }}</td>
                         <td>{{ $stat->approved }}</td>
                         <td>
-                            <div style="display: flex; align-items: center; gap: .5rem;">
-                                <div style="flex: 1; height: 8px; background: var(--color-surface-100); border-radius: 4px; overflow: hidden;">
-                                    <div style="width: {{ $pct }}%; height: 100%; background: var(--color-brand-500); border-radius: 4px;"></div>
+                            <div class="progress-bar-wrapper">
+                                <div class="progress-bar-track">
+                                    <div class="progress-bar-fill progress-bar-fill-brand" style="width: {{ $pct }}%;"></div>
                                 </div>
-                                <span style="font-size: .75rem; font-weight: 600; min-width: 36px;">{{ $pct }}%</span>
+                                <span class="progress-bar-label">{{ $pct }}%</span>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="text-center text-muted" style="padding: 2rem;">No data for the selected period.</td></tr>
+                    <tr><td colspan="4" class="text-center text-muted empty-table-cell">No data for the selected period.</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -118,46 +122,46 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="card animate-fade-in-up" style="animation-delay: 100ms; margin-top: 1rem;">
     <div class="card-header"><h3 class="card-title">Event Engagement Report</h3></div>
     <div class="card-body">
-        <form method="GET" action="{{ url('/dashboard') }}" class="search-bar" style="margin-bottom: 1rem;">
+        <form method="GET" action="{{ url('/dashboard') }}" class="search-bar report-filter-bar">
             <input type="hidden" name="section" value="reports">
             <input type="hidden" name="report" value="event-engagement">
-            <div class="form-group" style="margin-bottom: 0;">
-                <input type="date" name="from" class="form-control" value="{{ $dateFrom ?? '' }}" style="max-width: 180px;">
+            <div class="form-group mb-0">
+                <input type="date" name="from" class="form-control report-date-input" value="{{ $dateFrom ?? '' }}">
             </div>
             <span class="text-muted">to</span>
-            <div class="form-group" style="margin-bottom: 0;">
-                <input type="date" name="to" class="form-control" value="{{ $dateTo ?? '' }}" style="max-width: 180px;">
+            <div class="form-group mb-0">
+                <input type="date" name="to" class="form-control report-date-input" value="{{ $dateTo ?? '' }}">
             </div>
             <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
         </form>
 
-        <div style="position: relative; height: 300px; width: 100%; margin-bottom: 2rem;">
+        <div class="report-chart-container">
             <canvas id="eventEngagementChart"></canvas>
         </div>
 
         <div class="table-responsive">
             <table class="data-table">
-                <thead><tr><th>Event</th><th>Date</th><th>Type</th><th>Registered</th><th>Capacity</th><th>Fill Rate</th></tr></thead>
+                <thead><tr><th scope="col">Event</th><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Registered</th><th scope="col">Capacity</th><th scope="col">Fill Rate</th></tr></thead>
                 <tbody>
                 @forelse($eventStats ?? [] as $ev)
                     @php $rate = ($ev->max_participants > 0) ? round(($ev->registrations_count / $ev->max_participants) * 100) : 0; @endphp
                     <tr>
-                        <td style="font-weight: 600;">{{ $ev->title }}</td>
+                        <td class="font-semibold">{{ $ev->title }}</td>
                         <td>{{ $ev->event_date->format('M d, Y') }}</td>
                         <td><span class="badge badge-general">{{ ucfirst($ev->event_type) }}</span></td>
                         <td>{{ $ev->registrations_count }}</td>
                         <td>{{ $ev->max_participants > 0 ? $ev->max_participants : '∞' }}</td>
                         <td>
-                            <div style="display: flex; align-items: center; gap: .5rem;">
-                                <div style="flex: 1; height: 8px; background: var(--color-surface-100); border-radius: 4px; overflow: hidden;">
-                                    <div style="width: {{ min($rate, 100) }}%; height: 100%; background: #10b981; border-radius: 4px;"></div>
+                            <div class="progress-bar-wrapper">
+                                <div class="progress-bar-track">
+                                    <div class="progress-bar-fill progress-bar-fill-success" style="width: {{ min($rate, 100) }}%;"></div>
                                 </div>
-                                <span style="font-size: .75rem; font-weight: 600; min-width: 36px;">{{ $rate }}%</span>
+                                <span class="progress-bar-label">{{ $rate }}%</span>
                             </div>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted" style="padding: 2rem;">No events for the selected period.</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted empty-table-cell">No events for the selected period.</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -217,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="card animate-fade-in-up" style="animation-delay: 100ms; margin-top: 1rem;">
     <div class="card-header"><h3 class="card-title">Audit Log</h3></div>
     <div class="card-body">
-        <form method="GET" action="{{ url('/dashboard') }}" class="search-bar" style="margin-bottom: 1rem;">
+        <form method="GET" action="{{ url('/dashboard') }}" class="search-bar report-filter-bar">
             <input type="hidden" name="section" value="reports">
             <input type="hidden" name="report" value="audit-log">
             <div class="search-input-wrapper">
@@ -227,11 +231,11 @@ document.addEventListener('DOMContentLoaded', function() {
         </form>
         <div class="table-responsive">
             <table class="data-table">
-                <thead><tr><th>User</th><th>Action</th><th>Table</th><th>Record ID</th><th>IP Address</th><th>Date</th></tr></thead>
+                <thead><tr><th scope="col">User</th><th scope="col">Action</th><th scope="col">Table</th><th scope="col">Record ID</th><th scope="col">IP Address</th><th scope="col">Date</th></tr></thead>
                 <tbody>
                 @forelse($auditLogs ?? [] as $log)
                     <tr>
-                        <td style="font-weight: 600;">{{ $log->user->full_name ?? 'System' }}</td>
+                        <td class="font-semibold">{{ $log->user->full_name ?? 'System' }}</td>
                         <td><code>{{ $log->action }}</code></td>
                         <td>{{ $log->table_name }}</td>
                         <td>{{ $log->record_id ?: '—' }}</td>
@@ -239,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>{{ $log->created_at->format('M d, Y H:i') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted" style="padding: 2rem;">No audit logs found.</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted empty-table-cell">No audit logs found.</td></tr>
                 @endforelse
                 </tbody>
             </table>

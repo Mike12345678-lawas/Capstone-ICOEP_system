@@ -41,13 +41,21 @@
                         <td><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
                         <td>{{ $event->registrations_count }}{{ $event->max_participants > 0 ? '/' . $event->max_participants : '' }}</td>
                         <td>
-                            @php $sb = match($event->status) { 'upcoming' => 'badge-general', 'ongoing' => 'badge-success', 'completed' => 'badge-warning', 'cancelled' => 'badge-error', default => 'badge-general' }; @endphp
-                            <span class="badge {{ $sb }}">{{ ucfirst($event->status) }}</span>
+                            <x-status-badge :status="$event->status" />
                         </td>
                         <td><a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm">View</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted" style="padding: 2rem;">No events found.</td></tr>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted" style="padding: 2rem 1rem;">
+                            <p style="margin-bottom: .5rem;">No events found.</p>
+                            @if(request('search') || request('status'))
+                                <a href="{{ url('/dashboard?section=events') }}" class="btn btn-secondary btn-sm">Clear Filters</a>
+                            @else
+                                <a href="{{ url('/events/create') }}" class="btn btn-primary btn-sm">Create Event</a>
+                            @endif
+                        </td>
+                    </tr>
                 @endforelse
                 </tbody>
             </table>

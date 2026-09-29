@@ -1,14 +1,14 @@
 @if($paginator->hasPages())
-<nav style="margin-top: 1.5rem; display: flex; justify-content: center; gap: .25rem; flex-wrap: wrap;">
+<nav class="pagination-nav" aria-label="Pagination">
     @if($paginator->onFirstPage())
-        <span class="btn btn-secondary btn-sm" style="opacity: 0.5;">&laquo; Previous</span>
+        <span class="btn btn-secondary btn-sm pagination-disabled">&laquo; Previous</span>
     @else
         <a href="{{ $paginator->previousPageUrl() }}" class="btn btn-secondary btn-sm">&laquo; Previous</a>
     @endif
 
     @foreach($elements as $element)
         @if(is_string($element))
-            <span class="btn btn-secondary btn-sm" style="opacity: 0.5;">{{ $element }}</span>
+            <span class="btn btn-secondary btn-sm pagination-disabled">{{ $element }}</span>
         @endif
         @if(is_array($element))
             @foreach($element as $page => $url)
@@ -24,7 +24,7 @@
     @if($paginator->hasMorePages())
         <a href="{{ $paginator->nextPageUrl() }}" class="btn btn-secondary btn-sm">Next &raquo;</a>
     @else
-        <span class="btn btn-secondary btn-sm" style="opacity: 0.5;">Next &raquo;</span>
+        <span class="btn btn-secondary btn-sm pagination-disabled">Next &raquo;</span>
     @endif
 </nav>
 @endif
