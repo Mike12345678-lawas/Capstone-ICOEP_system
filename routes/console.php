@@ -40,3 +40,11 @@ Schedule::command(ExpirePendingRequests::class)
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/expired_requests.log'))
     ->description('Cancel pending requests whose date has already passed');
+
+// Auto-resolve pending requests sweep — runs every 5 minutes
+Schedule::command(\App\Console\Commands\AutoResolveRequests::class)
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/auto_resolve.log'))
+    ->description('Auto-resolve pending facility reservations and equipment requests based on deterministic priority rules');
+

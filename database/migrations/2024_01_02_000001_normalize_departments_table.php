@@ -52,11 +52,15 @@ return new class extends Migration
         });
 
         // 4. Backfill — map existing string values to the new FK
-        DB::statement('
-            UPDATE users u
-            INNER JOIN departments d ON d.name = u.department
-            SET u.department_id = d.id
-        ');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('UPDATE users SET department_id = (SELECT id FROM departments WHERE departments.name = users.department)');
+        } else {
+            DB::statement('
+                UPDATE users u
+                INNER JOIN departments d ON d.name = u.department
+                SET u.department_id = d.id
+            ');
+        }
 
         // 5. Drop the old free-text column
         Schema::table('users', function (Blueprint $table) {
@@ -71,11 +75,15 @@ return new class extends Migration
             $table->string('department')->nullable()->after('department_id');
         });
 
-        DB::statement('
-            UPDATE users u
-            INNER JOIN departments d ON d.id = u.department_id
-            SET u.department = d.name
-        ');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('UPDATE users SET department = (SELECT name FROM departments WHERE departments.id = users.department_id)');
+        } else {
+            DB::statement('
+                UPDATE users u
+                INNER JOIN departments d ON d.id = u.department_id
+                SET u.department = d.name
+            ');
+        }
 
         Schema::table('users', function (Blueprint $table) {
             $table->dropConstrainedForeignId('department_id');

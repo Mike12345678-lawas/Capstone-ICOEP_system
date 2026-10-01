@@ -18,15 +18,15 @@ class AuditLog extends Model
     /**
      * Log an audit action (replaces native logAudit() function).
      */
-    public static function log(string $action, ?string $tableName = null, ?int $recordId = null): self
+    public static function log(string $action, ?string $tableName = null, ?int $recordId = null, ?int $userId = null): self
     {
         return self::create([
-            'user_id' => Auth::id(),
+            'user_id' => $userId ?? Auth::id(),
             'action' => $action,
             'table_name' => $tableName,
             'record_id' => $recordId,
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
+            'ip_address' => request() ? request()->ip() : '127.0.0.1',
+            'user_agent' => request() ? request()->userAgent() : 'CLI/System',
         ]);
     }
 }

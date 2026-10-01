@@ -3,24 +3,281 @@
 namespace App\Services;
 
 use App\Models\Equipment;
+use App\Models\EquipmentRequest;
 use App\Models\Facility;
 use App\Models\FacilityReservation;
 use Illuminate\Support\Carbon;
 
 /**
- * AlternativeSuggester — When a resource is unavailable, instantly queries
- * the database and suggests alternatives:
- *  - Alternate available time slots for the same facility
- *  - Substitute equipment with sufficient stock
- *  - Different vacant rooms/facilities
+ * AlternativeSuggester — Pure deterministic logic for generating alternative
+ * facility bookings and equipment borrow options.
+ *
+ * Rules:
+ *  - Facilities:
+ *    a. Other facilities free at same date/time, capacity >= original, closest capacity first
+ *    b. Same facility, nearest free time slots the same day (within config operating hours)
+ *    c. Same facility and same time on the next 3 days
+ *    Capped at config max_suggestions (default 5).
+ *    ONLY approved reservations count as occupied; pending rows are ignored.
+ *
+ *  - Equipment:
+ *    a. Same category substitutes with sufficient stock first
+ *    b. Other categories with sufficient stock second
+ *    Capped at config max_suggestions (default 5).
  */
 class AlternativeSuggester
 {
     /**
-     * Suggest available time slots for the same facility on the same date.
-     * Scans the day in 1-hour increments and finds free windows.
+     * Build up to 5 ordered facility suggestions:
+     *  a. Other facilities free at the same date/time, with capacity >= the original, closest capacity first
+     *  b. Same facility, nearest free time slots the same day
+     *  c. Same facility and same time on the next 3 days
      *
-     * @return array<int, array{start: string, end: string}>
+     * @return array<int, array{type: string, label: string, facility_id?: int, name?: string, location?: string, capacity?: int, date?: string, start?: string, end?: string}>
+     */
+    public static function suggestFacilityAlternatives(
+        Facility $facility,
+        string $date,
+        string $timeStart,
+        string $timeEnd
+    ): array {
+        $maxSuggestions = (int) config('icoep.auto_approve.facility.max_suggestions', 5);
+        $suggestions = [];
+
+        // ─── a. Other facilities free at the same date/time (cap >= original, closest first) ───
+        $otherFacilities = Facility::where('id', '!=', $facility->id)
+            ->where('status', 'available')
+            ->where('capacity', '>=', $facility->capacity)
+            ->get()
+            ->sortBy(function ($fac) use ($facility) {
+                return abs($fac->capacity - $facility->capacity);
+            });
+
+        foreach ($otherFacilities as $fac) {
+            if (count($suggestions) >= $maxSuggestions) {
+                break;
+            }
+
+            // Only approved reservations block a slot; pending rows are ignored
+            $hasConflict = FacilityReservation::conflicts($fac->id, $date, $timeStart, $timeEnd)->exists();
+
+            if (!$hasConflict) {
+                $suggestions[] = [
+                    'type'        => 'alternate_facility',
+                    'facility_id' => $fac->id,
+                    'name'        => $fac->name,
+                    'location'    => $fac->location,
+                    'capacity'    => $fac->capacity,
+                    'label'       => "{$fac->name} ({$fac->location})",
+                ];
+            }
+        }
+
+        // ─── b. Same facility, nearest free time slots the same day ───
+        if (count($suggestions) < $maxSuggestions) {
+            $opStartStr = config('icoep.auto_approve.facility.operating_start', '07:00');
+            $opEndStr   = config('icoep.auto_approve.facility.operating_end', '20:00');
+
+            $reqStart = Carbon::parse($date . ' ' . $timeStart);
+            $reqEnd   = Carbon::parse($date . ' ' . $timeEnd);
+            $durationMinutes = $reqStart->diffInMinutes($reqEnd);
+            if ($durationMinutes < 30) {
+                $durationMinutes = 60;
+            }
+
+            $dayStart = Carbon::parse($date . ' ' . $opStartStr);
+            $dayEnd   = Carbon::parse($date . ' ' . $opEndStr);
+
+            // Fetch occupied approved blocks
+            $approvedRes = FacilityReservation::where('facility_id', $facility->id)
+                ->whereDate('reservation_date', $date)
+                ->where('status', 'approved')
+                ->orderBy('time_start')
+                ->get();
+
+            $occupied = [];
+            foreach ($approvedRes as $r) {
+                $occupied[] = [
+                    'start' => Carbon::parse($date . ' ' . $r->time_start),
+                    'end'   => Carbon::parse($date . ' ' . $r->time_end),
+                ];
+            }
+
+            // Scan candidate windows in 30-min intervals
+            $candidateSlots = [];
+            $cursor = $dayStart->copy();
+
+            while ($cursor->copy()->addMinutes($durationMinutes)->lte($dayEnd)) {
+                $windowEnd = $cursor->copy()->addMinutes($durationMinutes);
+                $isFree = true;
+
+                foreach ($occupied as $occ) {
+                    if ($cursor->lt($occ['end']) && $windowEnd->gt($occ['start'])) {
+                        $isFree = false;
+                        break;
+                    }
+                }
+
+                if ($isFree) {
+                    $sStart = $cursor->format('H:i');
+                    $sEnd   = $windowEnd->format('H:i');
+
+                    // Do not suggest the exact requested slot that conflicted
+                    if ($sStart !== $timeStart || $sEnd !== $timeEnd) {
+                        $distance = abs($cursor->diffInMinutes($reqStart));
+                        $candidateSlots[] = [
+                            'distance' => $distance,
+                            'slot'     => [
+                                'type'     => 'time_slot',
+                                'facility' => $facility->name,
+                                'date'     => $date,
+                                'start'    => $sStart,
+                                'end'      => $sEnd,
+                                'label'    => "{$date} {$sStart}–{$sEnd}",
+                            ],
+                        ];
+                    }
+                }
+
+                $cursor->addMinutes(30);
+            }
+
+            // Nearest to requested start time first
+            usort($candidateSlots, fn($a, $b) => $a['distance'] <=> $b['distance']);
+
+            foreach ($candidateSlots as $cand) {
+                if (count($suggestions) >= $maxSuggestions) {
+                    break;
+                }
+                $suggestions[] = $cand['slot'];
+            }
+        }
+
+        // ─── c. Same facility and same time on the next 3 days ───
+        if (count($suggestions) < $maxSuggestions) {
+            for ($i = 1; $i <= 3 && count($suggestions) < $maxSuggestions; $i++) {
+                $altDate = Carbon::parse($date)->addDays($i)->toDateString();
+                $hasConflict = FacilityReservation::conflicts(
+                    $facility->id,
+                    $altDate,
+                    $timeStart,
+                    $timeEnd
+                )->exists();
+
+                if (!$hasConflict) {
+                    $suggestions[] = [
+                        'type'     => 'alternate_date',
+                        'facility' => $facility->name,
+                        'date'     => $altDate,
+                        'start'    => $timeStart,
+                        'end'      => $timeEnd,
+                        'label'    => "{$altDate} {$timeStart}–{$timeEnd}",
+                    ];
+                }
+            }
+        }
+
+        return array_slice($suggestions, 0, $maxSuggestions);
+    }
+
+    /**
+     * Suggest substitute equipment:
+     *  a. Same category substitutes with sufficient stock first
+     *  b. Other categories with sufficient stock second
+     *
+     * @return array<int, array{type: string, equipment_id: int, name: string, category: string, available: int, label: string}>
+     */
+    public static function suggestAlternateEquipment(
+        Equipment $excludeItem,
+        int $neededQty,
+        ?string $dateNeeded = null,
+        ?string $expectedReturn = null
+    ): array {
+        $maxSuggestions = (int) config('icoep.auto_approve.equipment.max_suggestions', 5);
+        $suggestions = [];
+
+        // Helper to determine available stock for an equipment item
+        $calcStock = function (Equipment $item) use ($dateNeeded, $expectedReturn) {
+            if ($dateNeeded && $expectedReturn) {
+                $conflicts = EquipmentRequest::where('equipment_id', $item->id)
+                    ->whereIn('status', ['approved', 'borrowed'])
+                    ->where('date_needed', '<=', $expectedReturn)
+                    ->where('expected_return_date', '>=', $dateNeeded)
+                    ->sum('quantity');
+
+                $periodStock = max(0, $item->quantity - $conflicts);
+                return min($periodStock, $item->available_quantity);
+            }
+            return $item->available_quantity;
+        };
+
+        // 1. Same category substitutes
+        $sameCat = Equipment::where('id', '!=', $excludeItem->id)
+            ->where('category', $excludeItem->category)
+            ->where('status', 'available')
+            ->get();
+
+        $sameCatList = [];
+        foreach ($sameCat as $item) {
+            $stock = $calcStock($item);
+            if ($stock >= $neededQty) {
+                $sameCatList[] = ['item' => $item, 'stock' => $stock];
+            }
+        }
+
+        usort($sameCatList, fn($a, $b) => $b['stock'] <=> $a['stock']);
+
+        foreach ($sameCatList as $c) {
+            if (count($suggestions) >= $maxSuggestions) {
+                break;
+            }
+            $suggestions[] = [
+                'type'         => 'alternate_equipment',
+                'equipment_id' => $c['item']->id,
+                'name'         => $c['item']->name,
+                'category'     => $c['item']->category,
+                'available'    => $c['stock'],
+                'label'        => "{$c['item']->name} ({$c['item']->category}, {$c['stock']} avail.)",
+            ];
+        }
+
+        // 2. Other categories
+        if (count($suggestions) < $maxSuggestions) {
+            $otherCat = Equipment::where('id', '!=', $excludeItem->id)
+                ->where('category', '!=', $excludeItem->category)
+                ->where('status', 'available')
+                ->get();
+
+            $otherCatList = [];
+            foreach ($otherCat as $item) {
+                $stock = $calcStock($item);
+                if ($stock >= $neededQty) {
+                    $otherCatList[] = ['item' => $item, 'stock' => $stock];
+                }
+            }
+
+            usort($otherCatList, fn($a, $b) => $b['stock'] <=> $a['stock']);
+
+            foreach ($otherCatList as $c) {
+                if (count($suggestions) >= $maxSuggestions) {
+                    break;
+                }
+                $suggestions[] = [
+                    'type'         => 'alternate_equipment',
+                    'equipment_id' => $c['item']->id,
+                    'name'         => $c['item']->name,
+                    'category'     => $c['item']->category,
+                    'available'    => $c['stock'],
+                    'label'        => "{$c['item']->name} ({$c['item']->category}, {$c['stock']} avail.)",
+                ];
+            }
+        }
+
+        return array_slice($suggestions, 0, $maxSuggestions);
+    }
+
+    /**
+     * Backward-compatibility aliases
      */
     public static function suggestAlternateTimeSlots(
         Facility $facility,
@@ -28,173 +285,15 @@ class AlternativeSuggester
         string $requestedStart,
         string $requestedEnd
     ): array {
-        // Get all approved/pending reservations for this facility on this date
-        $reservations = FacilityReservation::where('facility_id', $facility->id)
-            ->where('reservation_date', $date)
-            ->whereIn('status', ['pending', 'approved'])
-            ->orderBy('time_start')
-            ->get(['time_start', 'time_end']);
-
-        // Calculate requested duration in minutes
-        $requestedDuration = Carbon::parse($requestedStart)->diffInMinutes(Carbon::parse($requestedEnd));
-        if ($requestedDuration < 30) $requestedDuration = 60; // minimum 1 hour
-
-        // Define operating hours (07:00 - 21:00)
-        $dayStart = Carbon::parse($date . ' 07:00');
-        $dayEnd   = Carbon::parse($date . ' 21:00');
-
-        // Build list of occupied intervals
-        $occupied = [];
-        foreach ($reservations as $res) {
-            $occupied[] = [
-                'start' => Carbon::parse($date . ' ' . $res->time_start),
-                'end'   => Carbon::parse($date . ' ' . $res->time_end),
-            ];
-        }
-
-        // Scan for free windows
-        $suggestions = [];
-        $cursor = $dayStart->copy();
-
-        while ($cursor->copy()->addMinutes($requestedDuration)->lte($dayEnd) && count($suggestions) < 5) {
-            $windowEnd = $cursor->copy()->addMinutes($requestedDuration);
-            $isFree = true;
-
-            foreach ($occupied as $occ) {
-                // Check overlap: cursor < occ.end AND windowEnd > occ.start
-                if ($cursor->lt($occ['end']) && $windowEnd->gt($occ['start'])) {
-                    $isFree = false;
-                    // Skip cursor to end of this occupied block
-                    $cursor = $occ['end']->copy();
-                    break;
-                }
-            }
-
-            if ($isFree) {
-                $slotStart = $cursor->format('H:i');
-                $slotEnd   = $windowEnd->format('H:i');
-
-                // Don't suggest the exact same slot that was rejected
-                if ($slotStart !== $requestedStart || $slotEnd !== $requestedEnd) {
-                    $suggestions[] = [
-                        'type'     => 'time_slot',
-                        'facility' => $facility->name,
-                        'date'     => $date,
-                        'start'    => $slotStart,
-                        'end'      => $slotEnd,
-                    ];
-                }
-
-                $cursor->addMinutes(30); // slide by 30 mins for next option
-            }
-        }
-
-        // Also suggest same slot on the next 3 days
-        for ($i = 1; $i <= 3 && count($suggestions) < 8; $i++) {
-            $altDate = Carbon::parse($date)->addDays($i)->toDateString();
-            $altConflicts = FacilityReservation::conflicts(
-                $facility->id, $altDate, $requestedStart, $requestedEnd
-            )->count();
-
-            if ($altConflicts === 0) {
-                $suggestions[] = [
-                    'type'     => 'alternate_date',
-                    'facility' => $facility->name,
-                    'date'     => $altDate,
-                    'start'    => $requestedStart,
-                    'end'      => $requestedEnd,
-                ];
-            }
-        }
-
-        return $suggestions;
+        return self::suggestFacilityAlternatives($facility, $date, $requestedStart, $requestedEnd);
     }
 
-    /**
-     * Suggest different facilities that are free during the requested time.
-     *
-     * @return array<int, array{facility_id: int, name: string, location: string, capacity: int}>
-     */
     public static function suggestAlternateFacilities(
         Facility $excludeFacility,
         string $date,
         string $timeStart,
         string $timeEnd
     ): array {
-        $facilities = Facility::where('id', '!=', $excludeFacility->id)
-            ->where('status', 'available')
-            ->get();
-
-        $suggestions = [];
-
-        foreach ($facilities as $fac) {
-            $conflicts = FacilityReservation::conflicts($fac->id, $date, $timeStart, $timeEnd)->count();
-
-            if ($conflicts === 0) {
-                $suggestions[] = [
-                    'type'        => 'alternate_facility',
-                    'facility_id' => $fac->id,
-                    'name'        => $fac->name,
-                    'location'    => $fac->location,
-                    'capacity'    => $fac->capacity,
-                ];
-
-                if (count($suggestions) >= 5) break;
-            }
-        }
-
-        return $suggestions;
-    }
-
-    /**
-     * Suggest substitute equipment in the same or similar category.
-     *
-     * @return array<int, array{equipment_id: int, name: string, category: string, available: int}>
-     */
-    public static function suggestAlternateEquipment(Equipment $excludeItem, int $neededQty): array
-    {
-        $suggestions = [];
-
-        // First: same category, different item
-        $sameCategory = Equipment::where('id', '!=', $excludeItem->id)
-            ->where('category', $excludeItem->category)
-            ->where('status', 'available')
-            ->where('available_quantity', '>=', $neededQty)
-            ->orderByDesc('available_quantity')
-            ->limit(3)
-            ->get();
-
-        foreach ($sameCategory as $item) {
-            $suggestions[] = [
-                'type'         => 'same_category',
-                'equipment_id' => $item->id,
-                'name'         => $item->name,
-                'category'     => $item->category,
-                'available'    => $item->available_quantity,
-            ];
-        }
-
-        // Second: any category with available stock
-        if (count($suggestions) < 5) {
-            $otherItems = Equipment::where('id', '!=', $excludeItem->id)
-                ->where('category', '!=', $excludeItem->category)
-                ->where('status', 'available')
-                ->where('available_quantity', '>=', $neededQty)
-                ->orderByDesc('available_quantity')
-                ->limit(5 - count($suggestions))
-                ->get();
-
-            foreach ($otherItems as $item) {
-                $suggestions[] = [
-                    'type'         => 'other_category',
-                    'equipment_id' => $item->id,
-                    'name'         => $item->name,
-                    'category'     => $item->category,
-                    'available'    => $item->available_quantity,
-                ];
-            }
-        }
-
-        return $suggestions;
+        return self::suggestFacilityAlternatives($excludeFacility, $date, $timeStart, $timeEnd);
     }
 }

@@ -41,7 +41,7 @@ class FacilityReservation extends Model
     public function scopeConflicts($query, int $facilityId, string $date, string $start, string $end)
     {
         return $query->where('facility_id', $facilityId)
-            ->where('reservation_date', $date)
+            ->whereDate('reservation_date', $date)
             ->where('status', 'approved')
             ->where(function ($q) use ($start, $end) {
                 $q->where('time_start', '<', $end)

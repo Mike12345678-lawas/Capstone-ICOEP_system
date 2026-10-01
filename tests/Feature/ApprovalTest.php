@@ -17,7 +17,10 @@ class ApprovalTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware();
+        $this->withoutMiddleware([
+            \App\Http\Middleware\CheckPermission::class,
+            \App\Http\Middleware\CheckActiveUser::class,
+        ]);
     }
 
     public function test_approve_equipment_with_insufficient_stock_is_refused()

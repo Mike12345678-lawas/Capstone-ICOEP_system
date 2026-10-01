@@ -47,6 +47,9 @@ return new class extends Migration
     private function indexExists(string $table, string $index): bool
     {
         $conn    = Schema::getConnection();
+        if ($conn->getDriverName() === 'sqlite') {
+            return DB::table('sqlite_master')->where('type', 'index')->where('name', $index)->exists();
+        }
         $dbName  = $conn->getDatabaseName();
         $count   = $conn->table('information_schema.statistics')
                         ->where('table_schema', $dbName)

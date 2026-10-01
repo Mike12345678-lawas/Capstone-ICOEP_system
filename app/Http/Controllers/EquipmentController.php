@@ -160,11 +160,9 @@ class EquipmentController extends Controller
             ->with('success', "Equipment \"{$name}\" deleted.");
     }
 
-    // ─── Borrow Flow (Solver-Enabled) ──────────────────────────────────
-
     /**
-     * Borrow equipment — processed through the deterministic ResourceSolver.
-     * Flow is pending + manual approval, or config-driven auto-approval.
+     * Borrow equipment — processed entirely through the deterministic ResourceSolver.
+     * The decision engine handles deterministic approval, priority preemption, or pending status.
      */
     public function borrow(Request $request, Equipment $equipment)
     {
@@ -177,48 +175,19 @@ class EquipmentController extends Controller
 
         $user = Auth::user();
 
-        // ─── Run deterministic solver ───
-        $result = DB::transaction(function () use ($request, $equipment, $user) {
-            // Lock equipment row to prevent race conditions
-            Equipment::lockForUpdate()->find($equipment->id);
+        $result = ResourceSolver::processEquipmentRequest(
+            $equipment,
+            $user,
+            $request->only(['quantity', 'purpose', 'date_needed', 'expected_return_date'])
+        );
 
-            $solverResult = ResourceSolver::resolveEquipmentRequest(
-                $equipment,
-                (int) $request->quantity,
-                $request->date_needed,
-                $request->expected_return_date,
-                $user
-            );
-
-            if ($solverResult['status'] === 'rejected') {
-                return $solverResult;
-            }
-
-            // ─── Create the request with pending status (inside the lock) ───
-            $eqRequest = EquipmentRequest::create([
-                'equipment_id'         => $equipment->id,
-                'user_id'              => $user->id,
-                'quantity'             => $request->quantity,
-                'purpose'              => $request->purpose,
-                'date_needed'          => $request->date_needed,
-                'expected_return_date' => $request->expected_return_date,
-                'status'               => 'pending',
-                'remarks'              => 'Pending admin approval',
-            ]);
-
-            AuditLog::log('CREATE_BORROW', 'equipment_requests', $eqRequest->id);
-
-            return array_merge($solverResult, ['eqRequest' => $eqRequest]);
-        });
-
-        // Handle preemption of lower-priority requests
         if ($result['status'] === 'rejected') {
             $suggestions = [];
             if (!empty($result['suggestions'])) {
-                foreach (array_slice($result['suggestions'], 0, 3) as $s) {
+                foreach (array_slice($result['suggestions'], 0, 5) as $s) {
                     $suggestions[] = [
                         'type'         => 'alternate_equipment',
-                        'label'        => "{$s['name']} ({$s['category']}, {$s['available']} avail.)",
+                        'label'        => $s['label'] ?? "{$s['name']} ({$s['category']}, {$s['available']} avail.)",
                         'equipment_id' => $s['equipment_id'] ?? $s['id'] ?? null,
                         'name'         => $s['name'] ?? null,
                     ];
@@ -230,74 +199,9 @@ class EquipmentController extends Controller
                 ->with('suggestions', $suggestions);
         }
 
-        $eqRequest = $result['eqRequest'];
-
-        // ─── Optional rule-based auto-approval ───────────────────────────
-        $autoCfg = config('icoep.auto_approve.equipment', []);
-        if (!empty($autoCfg['enabled'])) {
-            $roleName     = $user->role->name ?? '';
-            $allowedRoles = $autoCfg['allowed_roles'] ?? [];
-            $buffer       = (int) ($autoCfg['min_stock_buffer'] ?? 0);
-            $roleAllowed  = in_array($roleName, $allowedRoles, true);
-
-            if ($roleAllowed && $result['status'] === 'approved') {
-                $autoApproved = DB::transaction(function () use ($eqRequest, $buffer) {
-                    $locked    = EquipmentRequest::lockForUpdate()->find($eqRequest->id);
-                    $equipment = Equipment::lockForUpdate()->find($locked->equipment_id);
-
-                    if ($equipment->available_quantity < ($locked->quantity + $buffer)) {
-                        return false;
-                    }
-
-                    $equipment->decrement('available_quantity', $locked->quantity);
-                    $locked->update([
-                        'status'      => 'approved',
-                        'remarks'     => 'Auto-approved by system rule.',
-                        'approved_by' => null,
-                    ]);
-                    return true;
-                });
-
-                if ($autoApproved) {
-                    $eqRequest->refresh();
-                    AuditLog::log('AUTO_APPROVED_BORROW', 'equipment_requests', $eqRequest->id);
-
-                    Notification::send(
-                        $user->id,
-                        '✅ Equipment Request Approved',
-                        "Your borrow request for \"{$equipment->name}\" (qty: {$request->quantity}) was automatically approved.",
-                        'success',
-                        '/equipment/' . $equipment->id
-                    );
-
-                    return redirect('/equipment/' . $equipment->id)
-                        ->with('success', 'Equipment request automatically approved — sufficient stock confirmed.');
-                }
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────
-
-        Notification::send(
-            $user->id,
-            '⏳ Equipment Request Pending',
-            "Your borrow request for \"{$equipment->name}\" (qty: {$request->quantity}) has been submitted and is pending admin approval.",
-            'info',
-            '/equipment/' . $equipment->id
-        );
-
-        // Notify Admins
-        $admins = \App\Models\User::whereHas('role', function($q) {
-            $q->where('name', 'Administrator');
-        })->get();
-
-        foreach ($admins as $admin) {
-            Notification::send(
-                $admin->id,
-                '🔔 New Equipment Request',
-                "{$user->full_name} has requested to borrow \"{$equipment->name}\" (qty: {$request->quantity}).",
-                'info',
-                '/dashboard?section=manage-equipment'
-            );
+        if ($result['status'] === 'approved') {
+            return redirect('/equipment/' . $equipment->id)
+                ->with('success', $result['message'] ?? 'Equipment request automatically approved — sufficient stock confirmed.');
         }
 
         return redirect('/equipment/' . $equipment->id)

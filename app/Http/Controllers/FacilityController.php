@@ -66,8 +66,8 @@ class FacilityController extends Controller
     }
 
     /**
-     * Reserve a facility — processed through the deterministic ResourceSolver.
-     * Flow is pending + manual approval, or config-driven auto-approval.
+     * Reserve a facility — processed entirely through the deterministic ResourceSolver.
+     * The decision engine handles deterministic approval, priority preemption, or pending status.
      */
     public function reserve(Request $request, Facility $facility)
     {
@@ -81,52 +81,20 @@ class FacilityController extends Controller
 
         $user = Auth::user();
 
-        // ─── Run deterministic solver ───
-        $result = DB::transaction(function () use ($request, $facility, $user) {
-            // Lock the facility's reservations to prevent race conditions
-            FacilityReservation::where('facility_id', $facility->id)
-                ->lockForUpdate()
-                ->get();
-
-            $solverResult = ResourceSolver::resolveFacilityReservation(
-                $facility,
-                $request->reservation_date,
-                $request->time_start,
-                $request->time_end,
-                $user
-            );
-
-            if ($solverResult['status'] === 'rejected') {
-                return $solverResult;
-            }
-
-            // ─── Create the reservation with pending status (inside the lock) ───
-            $reservation = FacilityReservation::create([
-                'facility_id'      => $facility->id,
-                'user_id'          => $user->id,
-                'title'            => $request->title,
-                'description'      => $request->description,
-                'reservation_date' => $request->reservation_date,
-                'time_start'       => $request->time_start,
-                'time_end'         => $request->time_end,
-                'status'           => 'pending',
-                'remarks'          => 'Pending admin approval',
-                'approved_by'      => null,
-            ]);
-
-            AuditLog::log('CREATE_RESERVATION', 'facility_reservations', $reservation->id);
-
-            return array_merge($solverResult, ['reservation' => $reservation]);
-        });
+        $result = ResourceSolver::processFacilityReservation(
+            $facility,
+            $user,
+            $request->only(['title', 'description', 'reservation_date', 'time_start', 'time_end'])
+        );
 
         if ($result['status'] === 'rejected') {
             $suggestions = [];
             if (!empty($result['suggestions'])) {
-                foreach (array_slice($result['suggestions'], 0, 3) as $s) {
+                foreach (array_slice($result['suggestions'], 0, 5) as $s) {
                     if (($s['type'] ?? '') === 'time_slot' || ($s['type'] ?? '') === 'alternate_date') {
                         $suggestions[] = [
                             'type'  => $s['type'],
-                            'label' => "{$s['date']} {$s['start']}–{$s['end']}",
+                            'label' => $s['label'] ?? "{$s['date']} {$s['start']}–{$s['end']}",
                             'date'  => $s['date'] ?? null,
                             'start' => $s['start'] ?? null,
                             'end'   => $s['end'] ?? null,
@@ -134,7 +102,7 @@ class FacilityController extends Controller
                     } elseif (($s['type'] ?? '') === 'alternate_facility') {
                         $suggestions[] = [
                             'type'        => 'alternate_facility',
-                            'label'       => "{$s['name']} ({$s['location']})",
+                            'label'       => $s['label'] ?? "{$s['name']} ({$s['location']})",
                             'facility_id' => $s['facility_id'] ?? $s['id'] ?? null,
                             'name'        => $s['name'] ?? null,
                         ];
@@ -147,88 +115,9 @@ class FacilityController extends Controller
                 ->with('suggestions', $suggestions);
         }
 
-        $reservation = $result['reservation'];
-
-        // ─── Optional rule-based auto-approval ───────────────────────────
-        $autoCfg = config('icoep.auto_approve.facility', []);
-        if (!empty($autoCfg['enabled'])) {
-            $roleName      = $user->role->name ?? '';
-            $allowedRoles  = $autoCfg['allowed_roles'] ?? [];
-            $opStart       = $autoCfg['operating_start'] ?? '00:00';
-            $opEnd         = $autoCfg['operating_end']   ?? '23:59';
-            $maxHours      = (int) ($autoCfg['max_duration_hours'] ?? 0);
-
-            $requestStart  = \Carbon\Carbon::parse($request->time_start);
-            $requestEnd    = \Carbon\Carbon::parse($request->time_end);
-            $durationHours = $requestStart->diffInMinutes($requestEnd) / 60;
-
-            $withinHours  = $requestStart->format('H:i') >= $opStart && $requestEnd->format('H:i') <= $opEnd;
-            $withinDur    = $maxHours === 0 || $durationHours <= $maxHours;
-            $roleAllowed  = in_array($roleName, $allowedRoles, true);
-
-            if ($roleAllowed && $withinHours && $withinDur && $result['status'] === 'approved') {
-                // Re-check inside a lock — no approved conflicts must exist
-                $autoApproved = DB::transaction(function () use ($reservation) {
-                    $locked    = FacilityReservation::lockForUpdate()->find($reservation->id);
-                    $conflicts = FacilityReservation::conflicts(
-                        $locked->facility_id,
-                        $locked->reservation_date->toDateString(),
-                        $locked->time_start,
-                        $locked->time_end
-                    )->where('status', 'approved')->where('id', '!=', $locked->id)->count();
-
-                    if ($conflicts > 0) {
-                        return false;
-                    }
-
-                    $locked->update([
-                        'status'      => 'approved',
-                        'remarks'     => 'Auto-approved by system rule.',
-                        'approved_by' => null,
-                    ]);
-                    return true;
-                });
-
-                if ($autoApproved) {
-                    $reservation->refresh();
-                    AuditLog::log('AUTO_APPROVED_RESERVATION', 'facility_reservations', $reservation->id);
-
-                    Notification::send(
-                        $user->id,
-                        '✅ Reservation Approved',
-                        "Your reservation for \"{$facility->name}\" on {$reservation->reservation_date->format('M d, Y')} ({$request->time_start}–{$request->time_end}) was automatically approved.",
-                        'success',
-                        '/facilities/' . $facility->id
-                    );
-
-                    return redirect('/facilities/' . $facility->id)
-                        ->with('success', 'Reservation automatically approved — no conflicts found.');
-                }
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────
-
-        Notification::send(
-            $user->id,
-            '⏳ Reservation Pending',
-            "Your reservation request for \"{$facility->name}\" on {$reservation->reservation_date->format('M d, Y')} ({$request->time_start}–{$request->time_end}) has been submitted and is pending admin approval.",
-            'info',
-            '/facilities/' . $facility->id
-        );
-
-        // Notify Admins
-        $admins = \App\Models\User::whereHas('role', function($q) {
-            $q->where('name', 'Administrator');
-        })->get();
-
-        foreach ($admins as $admin) {
-            Notification::send(
-                $admin->id,
-                '🔔 New Facility Reservation',
-                "{$user->full_name} has requested to reserve \"{$facility->name}\" for {$reservation->reservation_date->format('M d, Y')}.",
-                'info',
-                '/dashboard?section=manage-bookings'
-            );
+        if ($result['status'] === 'approved') {
+            return redirect('/facilities/' . $facility->id)
+                ->with('success', $result['message'] ?? 'Reservation automatically approved — no conflicts found.');
         }
 
         return redirect('/facilities/' . $facility->id)
