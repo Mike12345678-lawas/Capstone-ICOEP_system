@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\User;
-use App\Http\Requests\RegisterRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -35,18 +34,47 @@ class AuthController extends Controller
             return back()->withInput()->with('error', 'Invalid ID or password.');
         }
 
-        // Check if account is locked
-        if ($user->status === 'locked') {
-            if ($user->locked_until && $user->locked_until->isFuture()) {
-                $minutes = $user->locked_until->diffInMinutes(now());
-                return back()->withInput()->with('error', "Account is locked. Please try again in {$minutes} minute(s).");
-            }
-            // Unlock expired lockout
-            $user->update(['status' => 'active', 'login_attempts' => 0, 'locked_until' => null]);
+        // Check if temporary lockout is active
+        if ($user->locked_until && $user->locked_until->isFuture()) {
+            $minutes = max(1, (int) ceil($user->locked_until->diffInSeconds(now()) / 60));
+            return back()->withInput()->with('error', "Too many failed attempts. Please try again in {$minutes} minute(s).");
+        }
+        if ($user->locked_until && $user->locked_until->isPast()) {
+            $user->update(['login_attempts' => 0, 'locked_until' => null]);
         }
 
+        $inactivityDays = (int) config('icoep.inactivity.days', 14);
+        $inactivityMsg = "Your account was deactivated after {$inactivityDays} days without activity. Please contact the administrator to reactivate it.";
+        $inactivityService = app(\App\Services\InactivityService::class);
+
+        // Lazy inactivity check: If active user is dormant, deactivate before password check
+        if ($user->status === 'active') {
+            if ($inactivityService->isDormant($user) && !$inactivityService->isProtected($user)['protected']) {
+                $allowSelfReactivation = (bool) config('icoep.inactivity.allow_self_reactivation', false);
+
+                if ($allowSelfReactivation && Hash::check($request->password, $user->password)) {
+                    // Password matches and self-reactivation allowed: auto-reactivate
+                    $inactivityService->reactivate($user);
+                } else {
+                    $inactivityService->deactivate($user, 'inactivity');
+                    return back()->withInput()->with('error', $inactivityMsg);
+                }
+            }
+        }
+
+        // Check if account is inactive
         if ($user->status === 'inactive') {
-            return back()->withInput()->with('error', 'Your account has been deactivated. Please contact administration.');
+            $allowSelfReactivation = (bool) config('icoep.inactivity.allow_self_reactivation', false);
+
+            if ($allowSelfReactivation && $user->deactivation_reason === 'inactivity' && Hash::check($request->password, $user->password)) {
+                // Auto-reactivate on correct password
+                $inactivityService->reactivate($user);
+            } else {
+                $errorMessage = $user->deactivation_reason === 'inactivity'
+                    ? $inactivityMsg
+                    : 'Your account has been deactivated. Please contact administration.';
+                return back()->withInput()->with('error', $errorMessage);
+            }
         }
 
         // Verify password
@@ -58,7 +86,6 @@ class AuthController extends Controller
             if ($attempts >= $maxAttempts) {
                 $user->update([
                     'login_attempts' => $attempts,
-                    'status'         => 'locked',
                     'locked_until'   => now()->addMinutes($lockoutMinutes),
                 ]);
                 AuditLog::log('LOGIN_FAILED_LOCKED', 'users', $user->id);
@@ -76,9 +103,11 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         $user->update([
-            'login_attempts' => 0,
-            'locked_until'   => null,
-            'last_login'     => now(),
+            'login_attempts'       => 0,
+            'locked_until'         => null,
+            'last_login'           => now(),
+            'last_activity_at'     => now(),
+            'inactivity_warned_at' => null,
         ]);
 
         AuditLog::log('LOGIN_SUCCESS', 'users', $user->id);
@@ -95,35 +124,5 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login')->with('success', 'You have been signed out.');
-    }
-
-    public function showRegisterForm()
-    {
-        if (Auth::check()) {
-            return redirect('/dashboard');
-        }
-        return view('auth.register');
-    }
-
-    public function register(RegisterRequest $request)
-    {
-        $validated = $request->validated();
-
-        $user = User::create([
-            'first_name'           => $validated['first_name'],
-            'last_name'            => $validated['last_name'],
-            'email'                => $validated['email'],
-            'employee_id'          => $validated['employee_id'] ?? null,
-            'department_id'        => $validated['department_id'] ?? null,
-            'password'             => $validated['password'],
-            'role_id'              => 4, // Student by default
-            'status'               => 'active',
-            'privacy_consent'      => true,
-            'privacy_consent_date' => now(),
-        ]);
-
-        AuditLog::log('REGISTER', 'users', $user->id);
-
-        return redirect()->route('login')->with('success', 'Account created successfully! Please sign in.');
     }
 }

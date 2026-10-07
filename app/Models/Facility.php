@@ -18,4 +18,10 @@ class Facility extends Model
     {
         return $query->where('status', 'available');
     }
+
+    /** The approved booking occupying this facility right now, or null if it's open. */
+    public function currentBooking(): ?FacilityReservation
+    {
+        return $this->reservations()->ongoing()->with('user')->first();
+    }
 }

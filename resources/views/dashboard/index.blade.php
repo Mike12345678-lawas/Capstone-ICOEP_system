@@ -10,6 +10,17 @@
     @case('equipment')
         @include('dashboard.partials._equipment')
         @break
+    @case('booked-facilities')
+    @case('my-bookings')
+        @include('dashboard.partials._booked_facilities')
+        @break
+    @case('borrowed-equipment')
+    @case('my-equipment')
+        @include('dashboard.partials._borrowed_equipment')
+        @break
+    @case('history')
+        @include('dashboard.partials._history')
+        @break
     @case('events')
         @include('dashboard.partials._events')
         @break

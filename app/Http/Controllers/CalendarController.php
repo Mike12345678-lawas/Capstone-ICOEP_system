@@ -18,28 +18,43 @@ class CalendarController extends Controller
     {
         // 1. Validate inputs to prevent parsing errors
         $request->validate([
-            'start' => 'nullable|date',
-            'end' => 'nullable|date',
+            'start' => 'nullable|string',
+            'end' => 'nullable|string',
         ]);
 
         try {
             // 2. Use robust Carbon dates with sensible fallbacks
-            $start = $request->filled('start') ? Carbon::parse($request->start)->startOfDay() : Carbon::now()->startOfMonth();
-            $end = $request->filled('end') ? Carbon::parse($request->end)->endOfDay() : Carbon::now()->endOfMonth();
+            $start = $request->filled('start') ? Carbon::parse($request->start)->startOfDay() : Carbon::now()->startOfMonth()->startOfDay();
+            $end = $request->filled('end') ? Carbon::parse($request->end)->endOfDay() : Carbon::now()->endOfMonth()->endOfDay();
 
-            // 3. Fetch facility reservations with null-safety on relations (approved and pending)
-            $reservations = FacilityReservation::with('facility')
-                ->whereIn('status', ['approved', 'pending'])
-                ->whereBetween('reservation_date', [$start, $end])
+            $startDate = $start->toDateString();
+            $endDate = $end->toDateString();
+
+            // 3. Fetch facility reservations (Pending, Approved, Completed)
+            $reservations = FacilityReservation::with(['facility', 'user'])
+                ->whereIn('status', ['approved', 'pending', 'completed'])
+                ->whereBetween('reservation_date', [$startDate, $endDate])
                 ->get()
                 ->map(function ($res) {
-                    $color = $res->status === 'approved' ? '#10b981' : '#f59e0b';
-                    $borderColor = $res->status === 'approved' ? '#059669' : '#d97706';
+                    $isPending = $res->status === 'pending';
+                    $color = $isPending ? '#f59e0b' : '#10b981';
+                    $borderColor = $isPending ? '#d97706' : '#059669';
+                    $statusLabel = $isPending ? '[Pending Booking] ' : '[Approved Booking] ';
+                    $facilityName = $res->facility->name ?? 'Facility';
+                    $dateStr = Carbon::parse($res->reservation_date)->format('Y-m-d');
+
+                    $timeStart = $res->time_start ? substr($res->time_start, 0, 5) : null;
+                    $timeEnd = $res->time_end ? substr($res->time_end, 0, 5) : null;
+
+                    $startFormatted = $timeStart ? "{$dateStr}T{$timeStart}:00" : $dateStr;
+                    $endFormatted = $timeEnd ? "{$dateStr}T{$timeEnd}:00" : ($timeStart ? "{$dateStr}T{$timeStart}:00" : null);
+
                     return [
                         'id' => 'res_' . $res->id,
-                        'title' => ($res->facility->name ?? 'Unknown Facility') . ' - ' . $res->title . ($res->status === 'pending' ? ' (Pending)' : ''),
-                        'start' => Carbon::parse($res->reservation_date)->format('Y-m-d') . 'T' . $res->time_start,
-                        'end' => Carbon::parse($res->reservation_date)->format('Y-m-d') . 'T' . $res->time_end,
+                        'title' => $statusLabel . $facilityName . ' - ' . $res->title,
+                        'start' => $startFormatted,
+                        'end' => $endFormatted,
+                        'allDay' => empty($timeStart),
                         'backgroundColor' => $color,
                         'borderColor' => $borderColor,
                         'textColor' => '#ffffff',
@@ -47,33 +62,61 @@ class CalendarController extends Controller
                         'extendedProps' => [
                             'type' => 'reservation',
                             'reservation_status' => $res->status,
-                            'description' => $res->description
+                            'description' => $res->description,
+                            'facility' => $facilityName,
+                            'booker' => $res->user ? ($res->user->first_name . ' ' . $res->user->last_name) : 'User',
+                            'time' => ($timeStart && $timeEnd) ? "{$timeStart} - {$timeEnd}" : 'All Day',
                         ]
                     ];
                 });
 
-            // 4. Fetch events
-            $events = Event::whereIn('status', ['upcoming', 'ongoing'])
-                ->whereBetween('event_date', [$start, $end])
+            // 4. Fetch campus events (Sports, Academic, Spiritual, Cultural, etc.)
+            $events = Event::whereIn('status', ['upcoming', 'ongoing', 'completed'])
+                ->whereBetween('event_date', [$startDate, $endDate])
                 ->get()
                 ->map(function ($event) {
-                    $color = '#3b82f6';
-                    $borderColor = '#2563eb';
-                    if ($event->event_type === 'sports') {
-                        $color = '#3b82f6';
-                        $borderColor = '#2563eb';
-                    } elseif ($event->event_type === 'academic') {
-                        $color = '#8b5cf6';
-                        $borderColor = '#7c3aed';
-                    } elseif ($event->event_type === 'spiritual') {
-                        $color = '#6366f1';
-                        $borderColor = '#4f46e5';
+                    $type = strtolower($event->event_type ?? 'other');
+                    switch ($type) {
+                        case 'sports':
+                            $color = '#3b82f6';
+                            $borderColor = '#2563eb';
+                            $typeLabel = '[Sports Event] ';
+                            break;
+                        case 'academic':
+                            $color = '#8b5cf6';
+                            $borderColor = '#7c3aed';
+                            $typeLabel = '[Academic Event] ';
+                            break;
+                        case 'spiritual':
+                            $color = '#6366f1';
+                            $borderColor = '#4f46e5';
+                            $typeLabel = '[Spiritual Event] ';
+                            break;
+                        case 'cultural':
+                            $color = '#ec4899';
+                            $borderColor = '#db2777';
+                            $typeLabel = '[Cultural Event] ';
+                            break;
+                        default:
+                            $color = '#64748b';
+                            $borderColor = '#475569';
+                            $typeLabel = '[' . ucfirst($type) . ' Event] ';
+                            break;
                     }
+
+                    $dateStr = Carbon::parse($event->event_date)->format('Y-m-d');
+                    $timeStart = $event->time_start ? substr($event->time_start, 0, 5) : null;
+                    $timeEnd = $event->time_end ? substr($event->time_end, 0, 5) : null;
+
+                    $startFormatted = $timeStart ? "{$dateStr}T{$timeStart}:00" : $dateStr;
+                    $endFormatted = $timeEnd ? "{$dateStr}T{$timeEnd}:00" : ($timeStart ? "{$dateStr}T{$timeStart}:00" : null);
+
                     return [
                         'id' => 'evt_' . $event->id,
-                        'title' => '[' . ucfirst($event->event_type ?? 'Event') . '] ' . $event->title,
-                        'start' => Carbon::parse($event->event_date)->format('Y-m-d') . 'T' . $event->time_start,
-                        'end' => Carbon::parse($event->event_date)->format('Y-m-d') . 'T' . $event->time_end,
+                        'title' => $typeLabel . $event->title,
+                        'start' => $startFormatted,
+                        'end' => $endFormatted,
+                        'allDay' => empty($timeStart),
                         'backgroundColor' => $color,
                         'borderColor' => $borderColor,
                         'textColor' => '#ffffff',
@@ -81,15 +124,20 @@ class CalendarController extends Controller
                         'extendedProps' => [
                             'type' => 'event',
                             'event_type' => $event->event_type,
-                            'description' => $event->description
+                            'description' => $event->description,
+                            'venue' => $event->venue,
+                            'time' => ($timeStart && $timeEnd) ? "{$timeStart} - {$timeEnd}" : 'All Day',
                         ]
                     ];
                 });
 
-            return response()->json($reservations->merge($events));
-            
+            // 5. Safely merge as plain array without Eloquent collection collision
+            $all = array_merge($reservations->all(), $events->all());
+
+            return response()->json($all);
+
         } catch (\Exception $e) {
-            // 5. Graceful error handling
+            // 6. Graceful error handling
             Log::error('Calendar events fetch error: ' . $e->getMessage());
             return response()->json(['error' => 'Unable to fetch events.'], 500);
         }

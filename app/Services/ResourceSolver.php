@@ -134,9 +134,9 @@ class ResourceSolver
             $autoCfg          = config('icoep.auto_approve.facility', []);
             $enabled          = (bool) ($autoCfg['enabled'] ?? true);
             $allowedRoles     = $autoCfg['allowed_roles'] ?? ['Administrator', 'Faculty', 'Staff', 'Student'];
-            $opStart          = $autoCfg['operating_start'] ?? '07:00';
-            $opEnd            = $autoCfg['operating_end'] ?? '20:00';
-            $maxDurationHours = (int) ($autoCfg['max_duration_hours'] ?? 8);
+            $opStart          = $autoCfg['operating_start'] ?? '06:00';
+            $opEnd            = $autoCfg['operating_end'] ?? '23:00';
+            $maxDurationHours = (int) ($autoCfg['max_duration_hours'] ?? 0);
 
             $reqStartDt    = Carbon::parse($timeStart);
             $reqEndDt      = Carbon::parse($timeEnd);
@@ -398,9 +398,9 @@ class ResourceSolver
             $autoCfg          = config('icoep.auto_approve.facility', []);
             $enabled          = (bool) ($autoCfg['enabled'] ?? true);
             $allowedRoles     = $autoCfg['allowed_roles'] ?? ['Administrator', 'Faculty', 'Staff', 'Student'];
-            $opStart          = $autoCfg['operating_start'] ?? '07:00';
-            $opEnd            = $autoCfg['operating_end'] ?? '20:00';
-            $maxDurationHours = (int) ($autoCfg['max_duration_hours'] ?? 8);
+            $opStart          = $autoCfg['operating_start'] ?? '06:00';
+            $opEnd            = $autoCfg['operating_end'] ?? '23:00';
+            $maxDurationHours = (int) ($autoCfg['max_duration_hours'] ?? 0);
 
             $reqStartDt    = Carbon::parse($timeStart);
             $reqEndDt      = Carbon::parse($timeEnd);
@@ -548,6 +548,27 @@ class ResourceSolver
             $dateNeeded     = $data['date_needed'];
             $expectedReturn = $data['expected_return_date'];
 
+            // Rule 0: User cannot borrow if having equipment overdue beyond threshold
+            $thresholdDays = (int) config('icoep.block_borrowing_after_days_overdue', 3);
+            $blockingOverdue = EquipmentRequest::with('equipment')
+                ->where('user_id', $requester->id)
+                ->where('status', 'borrowed')
+                ->where('expected_return_date', '<', Carbon::now()->startOfDay())
+                ->get()
+                ->first(function ($r) use ($thresholdDays) {
+                    return (int) $r->expected_return_date->startOfDay()->diffInDays(Carbon::now()->startOfDay()) > $thresholdDays;
+                });
+
+            if ($blockingOverdue) {
+                $days = (int) $blockingOverdue->expected_return_date->startOfDay()->diffInDays(Carbon::now()->startOfDay());
+                $reason = "Borrowing is blocked: you have an overdue item (\"{$blockingOverdue->equipment->name}\") that is {$days} day(s) overdue. Please return it before requesting equipment.";
+                return [
+                    'status'  => 'rejected',
+                    'reason'  => $reason,
+                    'request' => null,
+                ];
+            }
+
             // Rule 1: Equipment must be available
             if ($lockedEquip->status !== 'available') {
                 $reason = "Equipment \"{$lockedEquip->name}\" is currently {$lockedEquip->status} and cannot be borrowed.";
@@ -575,8 +596,10 @@ class ResourceSolver
                 ];
             }
 
-            // Rule 2: Date needed cannot be in the past
-            if (Carbon::parse($dateNeeded)->isPast()) {
+            // Rule 2: Date needed cannot be before today
+            $dateNeededStr = Carbon::parse($dateNeeded)->toDateString();
+            $todayStr      = Carbon::today()->toDateString();
+            if ($dateNeededStr < $todayStr) {
                 $reason = 'Cannot borrow equipment for a past date.';
                 $suggestions = AlternativeSuggester::suggestAlternateEquipment($lockedEquip, $quantity, $dateNeeded, $expectedReturn);
 
@@ -602,66 +625,9 @@ class ResourceSolver
                 ];
             }
 
-            // Config check
-            $autoCfg      = config('icoep.auto_approve.equipment', []);
-            $enabled      = (bool) ($autoCfg['enabled'] ?? true);
-            $allowedRoles = $autoCfg['allowed_roles'] ?? ['Administrator', 'Faculty', 'Staff', 'Student'];
-            $buffer       = (int) ($autoCfg['min_stock_buffer'] ?? 0);
-            $roleName     = $requester->role->name ?? 'Student';
-            $roleAllowed  = in_array($roleName, $allowedRoles, true);
-
-            if (!$enabled || !$roleAllowed) {
-                // Keep pending for admin
-                $eqRequest = EquipmentRequest::create([
-                    'equipment_id'         => $lockedEquip->id,
-                    'user_id'              => $requester->id,
-                    'quantity'             => $quantity,
-                    'purpose'              => $purpose,
-                    'date_needed'          => $dateNeeded,
-                    'expected_return_date' => $expectedReturn,
-                    'status'               => 'pending',
-                    'remarks'              => 'Pending admin approval',
-                    'approved_by'          => null,
-                ]);
-
-                AuditLog::log('CREATE_BORROW', 'equipment_requests', $eqRequest->id, $requester->id);
-
-                Notification::send(
-                    $requester->id,
-                    '⏳ Equipment Request Pending',
-                    "Your borrow request for \"{$lockedEquip->name}\" (qty: {$quantity}) has been submitted and is pending admin approval.",
-                    'info',
-                    '/equipment/' . $lockedEquip->id
-                );
-
-                self::notifyAdmins(
-                    '🔔 New Equipment Request',
-                    "{$requester->full_name} has requested to borrow \"{$lockedEquip->name}\" (qty: {$quantity}).",
-                    '/dashboard?section=manage-equipment'
-                );
-
-                return [
-                    'status'  => 'pending',
-                    'reason'  => 'Request requires manual admin review.',
-                    'request' => $eqRequest,
-                ];
-            }
-
-            // Rule 3: Compute stock for the requested date range
-            // Sum of approved + borrowed requests overlapping the requested range
-            $overlappingRequests = EquipmentRequest::where('equipment_id', $lockedEquip->id)
-                ->whereIn('status', ['approved', 'borrowed'])
-                ->where('date_needed', '<=', $expectedReturn)
-                ->where('expected_return_date', '>=', $dateNeeded)
-                ->with('user.role')
-                ->get();
-
-            $overlappingDemand = (int) $overlappingRequests->sum('quantity');
-            $availableStockForRange = max(0, $lockedEquip->quantity - $overlappingDemand);
-            $neededTotal = $quantity + $buffer;
-
-            // Enough stock -> auto-approve (FCFS), decrementing available_quantity
-            if ($availableStockForRange >= $neededTotal && $lockedEquip->available_quantity >= $quantity) {
+            // If auto-approval is enabled and sufficient stock is available, auto-approve so borrower gets the item immediately
+            $autoApproveEquip = (bool) config('icoep.auto_approve.equipment.enabled', true);
+            if ($autoApproveEquip && $lockedEquip->available_quantity >= $quantity) {
                 $lockedEquip->decrement('available_quantity', $quantity);
 
                 $eqRequest = EquipmentRequest::create([
@@ -672,7 +638,7 @@ class ResourceSolver
                     'date_needed'          => $dateNeeded,
                     'expected_return_date' => $expectedReturn,
                     'status'               => 'approved',
-                    'remarks'              => 'Auto-approved by system rule.',
+                    'remarks'              => 'Auto-approved: stock reserved.',
                     'approved_by'          => null,
                 ]);
 
@@ -680,122 +646,20 @@ class ResourceSolver
 
                 Notification::send(
                     $requester->id,
-                    '✅ Equipment Request Approved',
-                    "Your borrow request for \"{$lockedEquip->name}\" (qty: {$quantity}) was automatically approved.",
+                    '✅ Equipment Borrow Approved',
+                    "Your borrow request for \"{$lockedEquip->name}\" (qty: {$quantity}) has been approved! You can track and return it below.",
                     'success',
-                    '/equipment/' . $lockedEquip->id
+                    '/dashboard?section=borrowed-equipment'
                 );
 
                 return [
                     'status'  => 'approved',
-                    'message' => 'Equipment request automatically approved — sufficient stock confirmed.',
+                    'message' => 'Equipment borrow request approved! Track and return your equipment below.',
                     'request' => $eqRequest,
                 ];
             }
 
-            // Rule 4: Not enough stock -> check priority preemption
-            // A higher-tier requester may preempt ONLY requests with status 'approved' (never 'borrowed')
-            // belonging to preemptible roles, cancelling the most recently created first until enough stock is freed.
-            $requesterTier    = self::getUserPriority($requester);
-            $preemptibleRoles = $autoCfg['preemptible_roles'] ?? ['Student'];
-
-            // Find preemptible candidates among overlapping approved requests
-            $candidates = $overlappingRequests->filter(function ($req) use ($requesterTier, $preemptibleRoles) {
-                if ($req->status !== 'approved') {
-                    return false; // borrowed items are NEVER preempted
-                }
-                $candRole = $req->user->role->name ?? 'Student';
-                if (!in_array($candRole, $preemptibleRoles, true)) {
-                    return false;
-                }
-                $candTier = self::getUserPriority($req->user);
-                return $requesterTier < $candTier; // strictly higher priority wins
-            })->sort(function ($a, $b) {
-                // Cancelling the most recently created first -> created_at DESC, then id DESC
-                $timeDiff = $b->created_at <=> $a->created_at;
-                if ($timeDiff !== 0) return $timeDiff;
-                return $b->id <=> $a->id;
-            });
-
-            $totalCandidateQty = (int) $candidates->sum('quantity');
-            $stockDeficit = $neededTotal - $availableStockForRange;
-
-            // Still not enough stock even if all preemptible candidates are cancelled?
-            if ($totalCandidateQty < $stockDeficit || ($lockedEquip->available_quantity + $totalCandidateQty) < $quantity) {
-                // Auto-reject with available count and suggestions; save rejected request
-                $reason = "Only {$availableStockForRange} of {$lockedEquip->quantity} unit(s) available for the requested period. You requested {$quantity}.";
-                $suggestions = AlternativeSuggester::suggestAlternateEquipment($lockedEquip, $quantity, $dateNeeded, $expectedReturn);
-
-                $eqRequest = EquipmentRequest::create([
-                    'equipment_id'         => $lockedEquip->id,
-                    'user_id'              => $requester->id,
-                    'quantity'             => $quantity,
-                    'purpose'              => $purpose,
-                    'date_needed'          => $dateNeeded,
-                    'expected_return_date' => $expectedReturn,
-                    'status'               => 'rejected',
-                    'remarks'              => $reason,
-                    'approved_by'          => null,
-                ]);
-
-                AuditLog::log('AUTO_REJECTED_BORROW', 'equipment_requests', $eqRequest->id, $requester->id);
-
-                return [
-                    'status'      => 'rejected',
-                    'reason'      => $reason,
-                    'request'     => $eqRequest,
-                    'suggestions' => $suggestions,
-                ];
-            }
-
-            // Preempt candidates until enough stock is freed
-            $freedStock = 0;
-            $preemptedRequests = [];
-
-            foreach ($candidates as $cand) {
-                if (($availableStockForRange + $freedStock) >= $neededTotal && ($lockedEquip->available_quantity >= $quantity)) {
-                    break;
-                }
-
-                $cand->update([
-                    'status'  => 'cancelled',
-                    'remarks' => "Cancelled: stock preempted by higher-priority request ({$roleName}).",
-                ]);
-
-                // Restore stock for cancelled request
-                $lockedEquip->increment('available_quantity', $cand->quantity);
-                $freedStock += $cand->quantity;
-
-                AuditLog::log('PREEMPTED_BORROW', 'equipment_requests', $cand->id, $cand->user_id);
-
-                // Build suggestions for bumped user
-                $bumpedSuggestions = AlternativeSuggester::suggestAlternateEquipment(
-                    $lockedEquip,
-                    $cand->quantity,
-                    $cand->date_needed->toDateString(),
-                    $cand->expected_return_date->toDateString()
-                );
-
-                $altText = '';
-                if (!empty($bumpedSuggestions)) {
-                    $labels = array_map(fn($s) => $s['label'] ?? '', array_slice($bumpedSuggestions, 0, 3));
-                    $altText = ' Suggested substitutes: ' . implode(', ', array_filter($labels));
-                }
-
-                Notification::send(
-                    $cand->user_id,
-                    '⚠️ Equipment Request Preempted',
-                    "Your borrow request for \"{$lockedEquip->name}\" (qty: {$cand->quantity}) was cancelled due to a higher-priority {$roleName} request.{$altText}",
-                    'warning',
-                    '/equipment/' . $lockedEquip->id
-                );
-
-                $preemptedRequests[] = $cand;
-            }
-
-            // Approve the new request, decrementing stock
-            $lockedEquip->decrement('available_quantity', $quantity);
-
+            // Insufficient immediate stock — keep as pending for manual admin review
             $eqRequest = EquipmentRequest::create([
                 'equipment_id'         => $lockedEquip->id,
                 'user_id'              => $requester->id,
@@ -803,26 +667,32 @@ class ResourceSolver
                 'purpose'              => $purpose,
                 'date_needed'          => $dateNeeded,
                 'expected_return_date' => $expectedReturn,
-                'status'               => 'approved',
-                'remarks'              => 'Auto-approved with priority preemption.',
+                'status'               => 'pending',
+                'remarks'              => 'Pending admin approval',
                 'approved_by'          => null,
             ]);
 
-            AuditLog::log('AUTO_APPROVED_BORROW', 'equipment_requests', $eqRequest->id, $requester->id);
+            AuditLog::log('CREATE_BORROW', 'equipment_requests', $eqRequest->id, $requester->id);
 
             Notification::send(
                 $requester->id,
-                '✅ Equipment Request Approved',
-                "Your borrow request for \"{$lockedEquip->name}\" (qty: {$quantity}) was automatically approved with priority preemption.",
-                'success',
-                '/equipment/' . $lockedEquip->id
+                '⏳ Equipment Request Pending',
+                "Your borrow request for \"{$lockedEquip->name}\" (qty: {$quantity}) has been submitted and is pending admin approval.",
+                'info',
+                '/dashboard?section=borrowed-equipment'
+            );
+
+            self::notifyAdmins(
+                '🔔 New Equipment Request',
+                "{$requester->full_name} has requested to borrow \"{$lockedEquip->name}\" (qty: {$quantity}).",
+                '/dashboard?section=manage-equipment'
             );
 
             return [
-                'status'    => 'approved',
-                'message'   => 'Equipment request automatically approved with priority preemption.',
-                'request'   => $eqRequest,
-                'preempted' => $preemptedRequests,
+                'status'  => 'pending',
+                'reason'  => 'Request requires manual admin review due to stock.',
+                'message' => 'Equipment request submitted. Waiting for admin approval.',
+                'request' => $eqRequest,
             ];
         });
     }
@@ -848,8 +718,9 @@ class ResourceSolver
             $dateNeeded = $lockedReq->date_needed->toDateString();
             $expectedReturn = $lockedReq->expected_return_date->toDateString();
 
-            // Rule 1: Equipment available & date not past
-            if ($equipment->status !== 'available' || Carbon::parse($dateNeeded)->isPast()) {
+            // Rule 1: Equipment available & date not before today
+            $isPastDate = Carbon::parse($dateNeeded)->toDateString() < Carbon::today()->toDateString();
+            if ($equipment->status !== 'available' || $isPastDate) {
                 $reason = $equipment->status !== 'available'
                     ? "Equipment \"{$equipment->name}\" is currently {$equipment->status}."
                     : 'Cannot borrow equipment for a past date.';
@@ -871,14 +742,14 @@ class ResourceSolver
 
             // Rule 2: Config check
             $autoCfg      = config('icoep.auto_approve.equipment', []);
-            $enabled      = (bool) ($autoCfg['enabled'] ?? true);
+            $enabled      = (bool) ($autoCfg['enabled'] ?? false);
             $allowedRoles = $autoCfg['allowed_roles'] ?? ['Administrator', 'Faculty', 'Staff', 'Student'];
             $buffer       = (int) ($autoCfg['min_stock_buffer'] ?? 0);
             $roleName     = $requester->role->name ?? 'Student';
             $roleAllowed  = in_array($roleName, $allowedRoles, true);
 
             if (!$enabled || !$roleAllowed) {
-                return ['status' => 'pending', 'action' => 'remain_pending', 'reason' => 'Role not allowed or disabled', 'request' => $lockedReq];
+                return ['status' => 'pending', 'action' => 'remain_pending', 'reason' => 'Auto-approval is disabled for equipment. Only facilities support auto-approval.', 'request' => $lockedReq];
             }
 
             // Rule 3: Compute stock for the date range

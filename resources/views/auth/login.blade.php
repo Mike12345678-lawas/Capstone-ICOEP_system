@@ -76,7 +76,7 @@
         </form>
 
         <div class="auth-footer">
-            Don't have an account? <a href="{{ url('/register') }}">Register here</a>
+            Need an account? Please contact the administrator.
         </div>
     </div>
 </div>

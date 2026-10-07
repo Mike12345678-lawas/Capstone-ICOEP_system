@@ -12,10 +12,10 @@
     </div>
     <div class="card-body" style="padding: 0;">
         <div class="grid grid-2" style="gap:0;">
-            <div style="padding:1rem;border-right:1px solid var(--color-border,#e2e8f0);">
+            <div class="action-box-left" style="padding:1rem;">
                 <p style="font-weight:700;font-size:.85rem;margin:0 0 .5rem;">Pending Facility Bookings</p>
                 @forelse(($needsActionBookings ?? collect()) as $r)
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
                     <span>{{ $r->user->full_name }} — <strong>{{ $r->facility->name }}</strong> ({{ $r->reservation_date->format('M d') }})</span>
                     <a href="{{ url('/dashboard?section=manage-bookings&status=pending') }}" class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Review</a>
                 </div>
@@ -23,13 +23,13 @@
                 <p class="text-muted" style="font-size:.85rem;margin:0;">None pending.</p>
                 @endforelse
                 @if(($needsActionBookings ?? collect())->count() >= 5)
-                <a href="{{ url('/dashboard?section=manage-bookings&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);">View all →</a>
+                <a href="{{ url('/dashboard?section=manage-bookings&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);display:inline-block;margin-top:.5rem;">View all →</a>
                 @endif
             </div>
-            <div style="padding:1rem;">
+            <div class="action-box-right" style="padding:1rem;">
                 <p style="font-weight:700;font-size:.85rem;margin:0 0 .5rem;">Pending Equipment Requests</p>
                 @forelse(($needsActionEquipment ?? collect()) as $r)
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
                     <span>{{ $r->user->full_name }} — <strong>{{ $r->equipment->name }}</strong> ×{{ $r->quantity }}</span>
                     <a href="{{ url('/dashboard?section=manage-equipment&status=pending') }}" class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Review</a>
                 </div>
@@ -37,7 +37,7 @@
                 <p class="text-muted" style="font-size:.85rem;margin:0;">None pending.</p>
                 @endforelse
                 @if(($needsActionEquipment ?? collect())->count() >= 5)
-                <a href="{{ url('/dashboard?section=manage-equipment&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);">View all →</a>
+                <a href="{{ url('/dashboard?section=manage-equipment&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);display:inline-block;margin-top:.5rem;">View all →</a>
                 @endif
             </div>
         </div>
@@ -95,25 +95,31 @@
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">My Recent Reservations</h3>
-            <a href="{{ url('/dashboard?section=facilities') }}" class="btn btn-secondary btn-sm">View All</a>
+            <a href="{{ url('/dashboard?section=booked-facilities') }}" class="btn btn-secondary btn-sm">View All</a>
         </div>
         <div class="card-body" style="padding: 0;">
-            <table class="data-table">
-                <thead><tr><th>Facility</th><th>Date</th><th>Status</th><th></th></tr></thead>
+            <table class="data-table mobile-cards">
+                <thead><tr><th>Facility</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                 @forelse($myReservations as $res)
                     <tr>
-                        <td style="font-weight: 600;">{{ $res->facility->name }}</td>
-                        <td>{{ $res->reservation_date->format('M d, Y') }}</td>
-                        <td>
+                        <td data-label="Facility" style="font-weight: 600;">{{ $res->facility->name }}</td>
+                        <td data-label="Date">{{ $res->reservation_date->format('M d, Y') }}</td>
+                        <td data-label="Status">
                             <x-status-badge :status="$res->status" />
                         </td>
-                        <td>
+                        <td data-label="Action" class="card-actions-cell">
                             @if($res->status === 'pending')
                                 <form method="POST" action="{{ url('/facility-reservations/' . $res->id . '/cancel') }}" style="margin:0;">
                                     @csrf @method('PATCH')
-                                    <button class="btn btn-secondary btn-sm" style="font-size:.75rem;"
+                                    <button class="btn btn-secondary btn-sm" style="font-size:.75rem; width: 100%;"
                                         onclick="return confirm('Cancel this reservation?')">Cancel</button>
+                                </form>
+                            @elseif($res->status === 'approved')
+                                <form method="POST" action="{{ url('/facility-reservations/' . $res->id . '/complete') }}" style="margin:0;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-success btn-sm" style="font-size:.75rem; width: 100%;"
+                                        onclick="return confirm('Free this facility now and mark it open?')">Make Open</button>
                                 </form>
                             @endif
                         </td>
@@ -135,26 +141,40 @@
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">My Recent Equipment Requests</h3>
-            <a href="{{ url('/dashboard?section=equipment') }}" class="btn btn-secondary btn-sm">View All</a>
+            <a href="{{ url('/dashboard?section=borrowed-equipment') }}" class="btn btn-secondary btn-sm">View All</a>
         </div>
         <div class="card-body" style="padding: 0;">
-            <table class="data-table">
-                <thead><tr><th>Equipment</th><th>Qty</th><th>Status</th><th></th></tr></thead>
+            <table class="data-table mobile-cards">
+                <thead><tr><th>Equipment</th><th>Qty</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                 @forelse($myBorrows as $borrow)
                     <tr>
-                        <td style="font-weight: 600;">{{ $borrow->equipment->name }}</td>
-                        <td>{{ $borrow->quantity }}</td>
-                        <td>
+                        <td data-label="Equipment" style="font-weight: 600;">{{ $borrow->equipment->name }}</td>
+                        <td data-label="Qty">{{ $borrow->quantity }} unit(s)</td>
+                        <td data-label="Status">
                             <x-status-badge :status="$borrow->status" />
+                            @if(in_array($borrow->status, ['borrowed', 'approved']) && $borrow->return_requested_at)
+                                <div>
+                                    <span class="badge badge-warning" style="font-size:.7rem; margin-top:.25rem; display:inline-block;">Waiting for admin check</span>
+                                </div>
+                            @endif
                         </td>
-                        <td>
+                        <td data-label="Action" class="card-actions-cell">
                             @if($borrow->status === 'pending')
                                 <form method="POST" action="{{ url('/equipment-requests/' . $borrow->id . '/cancel') }}" style="margin:0;">
                                     @csrf @method('PATCH')
-                                    <button class="btn btn-secondary btn-sm" style="font-size:.75rem;"
+                                    <button class="btn btn-secondary btn-sm" style="font-size:.75rem; width: 100%;"
                                         onclick="return confirm('Cancel this request?')">Cancel</button>
                                 </form>
+                            @elseif(in_array($borrow->status, ['borrowed', 'approved']))
+                                @if(is_null($borrow->return_requested_at))
+                                    <a href="{{ url('/dashboard?section=borrowed-equipment&return=' . $borrow->id) }}" class="btn btn-primary btn-sm" style="font-size:.75rem; width: 100%;">Return Equipment</a>
+                                @else
+                                    <form method="POST" action="{{ url('/equipment-requests/' . $borrow->id . '/cancel-return-request') }}" style="margin:0;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-secondary btn-sm" style="font-size:.75rem; width: 100%;" title="Cancel return check notification">Cancel Check</button>
+                                    </form>
+                                @endif
                             @endif
                         </td>
                     </tr>
@@ -180,14 +200,14 @@
             <a href="{{ url('/dashboard?section=events') }}" class="btn btn-secondary btn-sm">View All</a>
         </div>
         <div class="card-body" style="padding: 0;">
-            <table class="data-table">
+            <table class="data-table mobile-cards">
                 <thead><tr><th>Event</th><th>Date</th><th>Type</th></tr></thead>
                 <tbody>
                 @forelse($upcomingEvents as $event)
                     <tr>
-                        <td><a href="{{ url('/events/' . $event->id) }}" style="font-weight: 600; color: var(--color-brand-600);">{{ $event->title }}</a></td>
-                        <td>{{ $event->event_date->format('M d, Y') }}</td>
-                        <td><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
+                        <td data-label="Event"><a href="{{ url('/events/' . $event->id) }}" style="font-weight: 600; color: var(--color-brand-600);">{{ $event->title }}</a></td>
+                        <td data-label="Date">{{ $event->event_date->format('M d, Y') }}</td>
+                        <td data-label="Type"><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
                     </tr>
                 @empty
                     <tr><td colspan="3" class="text-center text-muted" style="padding: 1.5rem;">No upcoming events.</td></tr>
@@ -204,21 +224,21 @@
             <a href="{{ url('/dashboard?section=announcements') }}" class="btn btn-secondary btn-sm">View All</a>
         </div>
         <div class="card-body" style="padding: 0;">
-            <table class="data-table">
+            <table class="data-table mobile-cards">
                 <thead><tr><th>Title</th><th>Priority</th><th>Date</th></tr></thead>
                 <tbody>
                 @forelse($latestAnnouncements as $ann)
                     <tr>
-                        <td>
+                        <td data-label="Title">
                             <a href="{{ url('/announcements/' . $ann->id) }}" style="font-weight: 600; color: var(--color-brand-600);">
                                 @if($ann->is_pinned) <span class="badge badge-warning" style="margin-right:4px;">Pinned</span> @endif{{ $ann->title }}
                             </a>
                         </td>
-                        <td>
+                        <td data-label="Priority">
                             @php $bc = match($ann->priority) { 'urgent' => 'badge-error', 'important' => 'badge-warning', default => 'badge-general' }; @endphp
                             <span class="badge {{ $bc }}">{{ ucfirst($ann->priority) }}</span>
                         </td>
-                        <td>{{ $ann->created_at->format('M d') }}</td>
+                        <td data-label="Date">{{ $ann->created_at->format('M d') }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="3" class="text-center text-muted" style="padding: 1.5rem;">No announcements.</td></tr>

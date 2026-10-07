@@ -27,6 +27,11 @@
         <h1 class="page-title">Equipment Requests</h1>
         <p class="page-subtitle">Review and approve or reject equipment borrowing requests.</p>
     </div>
+    <div>
+        <a href="{{ url('/equipment/returns') }}" class="btn btn-primary btn-sm">
+            📦 Equipment Returns Desk
+        </a>
+    </div>
 </div>
 <div class="card animate-fade-in-up" style="animation-delay: 100ms;">
     <div class="card-body">
@@ -92,6 +97,12 @@
                                     <button class="btn btn-danger btn-sm btn-action-large"
                                         onclick="openEqRejectModal({{ $req->id }}, this)">Reject</button>
                                 </div>
+                            @elseif(auth()->user()->hasPermission('equipment.approve') && $req->status === 'approved')
+                                <form method="POST" action="{{ url('/equipment-requests/' . $req->id . '/status') }}" style="margin:0;">
+                                    @csrf @method('PATCH')
+                                    <input type="hidden" name="status" value="borrowed">
+                                    <button type="submit" class="btn btn-primary btn-sm" style="font-size: 0.75rem;">Release (Mark Borrowed)</button>
+                                </form>
                             @else
                                 <span class="text-muted">—</span>
                             @endif

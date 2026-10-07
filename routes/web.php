@@ -4,6 +4,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EquipmentController;
+use App\Http\Controllers\EquipmentReturnController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\NotificationController;
@@ -18,8 +19,6 @@ Route::middleware('guest')->group(function () {
     Route::get('/', fn() => redirect('/login'));
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
-    Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
@@ -46,6 +45,11 @@ Route::middleware('auth')->group(function () {
     // ─── Redirect legacy index routes to the unified dashboard ───
     Route::get('/facilities', fn() => redirect('/dashboard?section=facilities'));
     Route::get('/equipment', fn() => redirect('/dashboard?section=equipment'));
+    Route::get('/borrowed-equipment', fn() => redirect('/dashboard?section=borrowed-equipment'));
+    Route::get('/booked-facilities', fn() => redirect('/dashboard?section=booked-facilities'));
+    Route::get('/my-equipment', fn() => redirect('/dashboard?section=borrowed-equipment'));
+    Route::get('/my-bookings', fn() => redirect('/dashboard?section=booked-facilities'));
+    Route::get('/history', fn() => redirect('/dashboard?section=history'));
     Route::get('/events', fn() => redirect('/dashboard?section=events'));
     Route::get('/announcements', fn() => redirect('/dashboard?section=announcements'));
     Route::get('/users', fn() => redirect('/dashboard?section=users'));
@@ -58,6 +62,7 @@ Route::middleware('auth')->group(function () {
     // ─── Detail/Show routes (still separate pages) ───
     Route::get('/facilities/{facility}', [FacilityController::class, 'show'])->middleware('permission:facility.view');
     Route::get('/equipment/create', [EquipmentController::class, 'create'])->middleware('permission:equipment.manage');
+    Route::get('/equipment/returns', [EquipmentReturnController::class, 'index'])->middleware('permission:equipment.approve');
     Route::get('/equipment/{equipment}', [EquipmentController::class, 'show'])->middleware('permission:equipment.view');
     Route::get('/events/my', [EventController::class, 'myEvents'])->middleware('permission:event.view');
     Route::get('/events/create', [EventController::class, 'create'])->middleware('permission:event.create');
@@ -74,12 +79,22 @@ Route::middleware('auth')->group(function () {
     Route::post('/facilities/{facility}/reserve', [FacilityController::class, 'reserve'])->middleware('permission:facility.reserve');
     Route::patch('/facility-reservations/{reservation}/status', [FacilityController::class, 'updateStatus'])->middleware('permission:facility.approve');
     Route::post('/facility-reservations/bulk-approve', [FacilityController::class, 'bulkApprove'])->middleware('permission:facility.approve');
+    Route::post('/facility-reservations/auto-resolve', [FacilityController::class, 'autoResolveAll'])->middleware('permission:facility.approve');
     Route::patch('/facility-reservations/{reservation}/cancel', [FacilityController::class, 'cancelOwn']);
+    Route::post('/facility-reservations/{reservation}/complete', [FacilityController::class, 'complete']);
+    Route::patch('/facility-reservations/{reservation}/complete', [FacilityController::class, 'complete']);
 
     Route::post('/equipment/{equipment}/borrow', [EquipmentController::class, 'borrow'])->middleware('permission:equipment.borrow');
     Route::patch('/equipment-requests/{equipmentRequest}/status', [EquipmentController::class, 'updateStatus'])->middleware('permission:equipment.approve');
     Route::post('/equipment-requests/bulk-approve', [EquipmentController::class, 'bulkApprove'])->middleware('permission:equipment.approve');
     Route::patch('/equipment-requests/{equipmentRequest}/cancel', [EquipmentController::class, 'cancelOwn']);
+
+    // ─── Equipment Returns ───
+    Route::post('/equipment-requests/{equipmentRequest}/return-request', [EquipmentReturnController::class, 'requestReturn']);
+    Route::post('/equipment-requests/{equipmentRequest}/cancel-return-request', [EquipmentReturnController::class, 'cancelReturnRequest']);
+    Route::delete('/equipment-requests/{equipmentRequest}/return-request', [EquipmentReturnController::class, 'cancelReturnRequest']);
+    Route::post('/equipment-requests/{equipmentRequest}/confirm-return', [EquipmentReturnController::class, 'confirmReturn'])->middleware('permission:equipment.approve');
+    Route::post('/equipment-requests/{equipmentRequest}/send-reminder', [EquipmentReturnController::class, 'sendReminder'])->middleware('permission:equipment.approve');
 
     // ─── Equipment Inventory CRUD (Admin) ───
     Route::post('/equipment', [EquipmentController::class, 'store'])->middleware('permission:equipment.manage');
@@ -109,6 +124,8 @@ Route::middleware('auth')->group(function () {
     // ─── Notifications API ───
     Route::get('/api/notifications', [NotificationController::class, 'getUnread']);
     Route::post('/api/notifications/mark-read', [NotificationController::class, 'markAllRead']);
+    Route::delete('/api/notifications', [NotificationController::class, 'destroyAll']);
+    Route::delete('/api/notifications/{notification}', [NotificationController::class, 'destroy']);
 
     // ─── Calendar API ───
     Route::get('/api/calendar/events', [CalendarController::class, 'getEvents']);

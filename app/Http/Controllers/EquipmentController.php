@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Equipment;
 use App\Models\EquipmentRequest;
 use App\Models\Notification;
+use App\Services\AlternativeSuggester;
 use App\Services\ResourceSolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -52,6 +53,16 @@ class EquipmentController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $myRequests = $equipment->requests()
+            ->where('user_id', Auth::id())
+            ->whereIn('status', ['pending', 'approved', 'borrowed', 'returned'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $alternatives = ($equipment->available_quantity < 1 || $equipment->status !== 'available')
+            ? AlternativeSuggester::suggestAlternateEquipment($equipment, 1)
+            : [];
+
         return view('equipment.show', [
             'pageTitle' => $equipment->name,
             'breadcrumb' => [
@@ -61,6 +72,8 @@ class EquipmentController extends Controller
             ],
             'equipment'      => $equipment,
             'activeRequests' => $activeRequests,
+            'myRequests'     => $myRequests,
+            'alternatives'   => $alternatives,
         ]);
     }
 
@@ -175,6 +188,26 @@ class EquipmentController extends Controller
 
         $user = Auth::user();
 
+        // Enforce overdue borrowing block
+        $thresholdDays = (int) config('icoep.block_borrowing_after_days_overdue', 3);
+        $blockingRequest = EquipmentRequest::with('equipment')
+            ->where('user_id', $user->id)
+            ->where('status', 'borrowed')
+            ->where('expected_return_date', '<', now()->startOfDay())
+            ->get()
+            ->first(function ($req) use ($thresholdDays) {
+                return (int) $req->expected_return_date->startOfDay()->diffInDays(now()->startOfDay()) > $thresholdDays;
+            });
+
+        if ($blockingRequest) {
+            $days = (int) $blockingRequest->expected_return_date->startOfDay()->diffInDays(now()->startOfDay());
+            $errorMsg = "Borrowing is blocked: you have an overdue item (\"{$blockingRequest->equipment->name}\") that is {$days} day(s) overdue. Please return it before making new requests.";
+            if ($request->expectsJson()) {
+                return response()->json(['error' => $errorMsg], 422);
+            }
+            return back()->withInput()->with('error', $errorMsg);
+        }
+
         $result = ResourceSolver::processEquipmentRequest(
             $equipment,
             $user,
@@ -186,10 +219,12 @@ class EquipmentController extends Controller
             if (!empty($result['suggestions'])) {
                 foreach (array_slice($result['suggestions'], 0, 5) as $s) {
                     $suggestions[] = [
-                        'type'         => 'alternate_equipment',
-                        'label'        => $s['label'] ?? "{$s['name']} ({$s['category']}, {$s['available']} avail.)",
-                        'equipment_id' => $s['equipment_id'] ?? $s['id'] ?? null,
-                        'name'         => $s['name'] ?? null,
+                        'type'                 => $s['type'] ?? 'alternate_equipment',
+                        'label'                => $s['label'] ?? "{$s['name']} ({$s['category']}, {$s['available']} avail.)",
+                        'equipment_id'         => $s['equipment_id'] ?? $s['id'] ?? null,
+                        'name'                 => $s['name'] ?? null,
+                        'date_needed'          => $s['date_needed'] ?? null,
+                        'expected_return_date' => $s['expected_return_date'] ?? null,
                     ];
                 }
             }
@@ -200,12 +235,12 @@ class EquipmentController extends Controller
         }
 
         if ($result['status'] === 'approved') {
-            return redirect('/equipment/' . $equipment->id)
-                ->with('success', $result['message'] ?? 'Equipment request automatically approved — sufficient stock confirmed.');
+            return redirect('/dashboard?section=borrowed-equipment')
+                ->with('success', $result['message'] ?? 'Equipment borrow request approved! Track and return your equipment below.');
         }
 
-        return redirect('/equipment/' . $equipment->id)
-            ->with('success', 'Equipment request submitted successfully. Waiting for admin approval.');
+        return redirect('/dashboard?section=borrowed-equipment')
+            ->with('success', 'Equipment borrow request submitted successfully! Your request is displayed below.');
     }
 
     // ─── Admin Request Management ───────────────────────────────────────
@@ -252,8 +287,8 @@ class EquipmentController extends Controller
 
         // ─── Allowed state transitions ───
         $allowedTransitions = [
-            'pending'  => ['approved', 'rejected', 'cancelled'],
-            'approved' => ['borrowed', 'cancelled'],
+            'pending'  => ['approved', 'borrowed', 'rejected', 'cancelled'],
+            'approved' => ['borrowed', 'returned', 'cancelled'],
             'borrowed' => ['returned'],
         ];
 

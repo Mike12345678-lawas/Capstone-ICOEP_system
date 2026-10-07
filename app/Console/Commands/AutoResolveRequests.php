@@ -12,7 +12,7 @@ class AutoResolveRequests extends Command
     protected $signature = 'requests:auto-resolve
                             {--dry-run : Simulate auto-resolution without modifying records}';
 
-    protected $description = 'Auto-resolve pending facility reservations and equipment borrow requests using deterministic priority rules';
+    protected $description = 'Auto-resolve pending facility reservations using deterministic priority rules (equipment requests require manual admin approval)';
 
     public function handle(): int
     {

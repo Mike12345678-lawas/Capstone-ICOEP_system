@@ -7,7 +7,7 @@
 @endif
 
 @if(session('error'))
-    <div class="flash-message flash-error animate-fade-in-up">
+    <div class="flash-message flash-error animate-fade-in-up" @if(session('suggestions') && count(session('suggestions')) > 0) data-persist="true" @endif>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line></svg>
         <div style="flex:1;">
             <span>{!! session('error') !!}</span>
@@ -24,45 +24,72 @@
                                 🕒 {{ $sug['label'] }}
                             </button>
                         @elseif(($sug['type'] ?? '') === 'alternate_facility')
-                            <a href="{{ url('/facilities/' . $sug['facility_id'] . '?reservation_date=' . old('reservation_date') . '&time_start=' . old('time_start') . '&time_end=' . old('time_end') . '&title=' . urlencode(old('title', ''))) }}"
+                            @php
+                                $fDate  = $sug['date']  ?? old('reservation_date');
+                                $fStart = $sug['start'] ?? old('time_start');
+                                $fEnd   = $sug['end']   ?? old('time_end');
+                            @endphp
+                            <a href="{{ url('/facilities/' . $sug['facility_id'] . '?reservation_date=' . $fDate . '&time_start=' . $fStart . '&time_end=' . $fEnd . '&title=' . urlencode(old('title', ''))) }}"
                                class="suggestion-chip"
-                               onclick="return prefillFacility('{{ $sug['facility_id'] }}');"
-                               title="Click to select this facility">
+                               onclick="return prefillFacility('{{ $sug['facility_id'] }}', '{{ $fDate }}', '{{ $fStart }}', '{{ $fEnd }}');"
+                               title="Click to select this facility on the suggested date">
                                 🏢 {{ $sug['label'] }}
                             </a>
+                        @elseif(($sug['type'] ?? '') === 'alternate_borrow_date')
+                            <button type="button" class="suggestion-chip"
+                                onclick="prefillBorrowDates('{{ $sug['date_needed'] }}', '{{ $sug['expected_return_date'] }}')"
+                                title="Click to use these borrow dates">
+                                📅 {{ $sug['label'] }}
+                            </button>
                         @elseif(($sug['type'] ?? '') === 'alternate_equipment')
-                            <a href="{{ url('/equipment/' . $sug['equipment_id'] . '?quantity=' . old('quantity', 1) . '&date_needed=' . old('date_needed') . '&expected_return_date=' . old('expected_return_date') . '&purpose=' . urlencode(old('purpose', ''))) }}"
+                            @php
+                                $eFrom = $sug['date_needed'] ?? old('date_needed');
+                                $eTo   = $sug['expected_return_date'] ?? old('expected_return_date');
+                            @endphp
+                            <a href="{{ url('/equipment/' . $sug['equipment_id'] . '?quantity=' . old('quantity', 1) . '&date_needed=' . $eFrom . '&expected_return_date=' . $eTo . '&purpose=' . urlencode(old('purpose', ''))) }}"
                                class="suggestion-chip"
-                               onclick="return prefillEquipment('{{ $sug['equipment_id'] }}');"
-                               title="Click to select this equipment">
+                               onclick="return prefillEquipment('{{ $sug['equipment_id'] }}', '{{ $eFrom }}', '{{ $eTo }}');"
+                               title="Click to select this equipment on the suggested dates">
                                 📦 {{ $sug['label'] }}
                             </a>
                         @endif
                     @endforeach
                 </div>
                 <script>
+                function setFieldValue(name, value) {
+                    const el = document.getElementById(name) || document.querySelector('[name="' + name + '"]');
+                    if (el && value) el.value = value;
+                    return el;
+                }
                 function prefillConflictSlot(date, start, end) {
-                    const d = document.getElementById('reservation_date') || document.querySelector('[name="reservation_date"]');
-                    const s = document.getElementById('time_start') || document.querySelector('[name="time_start"]');
-                    const e = document.getElementById('time_end') || document.querySelector('[name="time_end"]');
-                    if (d && date) d.value = date;
-                    if (s && start) s.value = start;
-                    if (e && end) e.value = end;
+                    const d = setFieldValue('reservation_date', date);
+                    setFieldValue('time_start', start);
+                    setFieldValue('time_end', end);
                     if (d) d.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
-                function prefillFacility(id) {
+                function prefillBorrowDates(from, to) {
+                    const d = setFieldValue('date_needed', from);
+                    setFieldValue('expected_return_date', to);
+                    if (d) d.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                function prefillFacility(id, date, start, end) {
                     const f = document.getElementById('facility_id') || document.querySelector('[name="facility_id"]');
                     if (f) {
                         f.value = id;
+                        setFieldValue('reservation_date', date);
+                        setFieldValue('time_start', start);
+                        setFieldValue('time_end', end);
                         f.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         return false;
                     }
                     return true;
                 }
-                function prefillEquipment(id) {
+                function prefillEquipment(id, from, to) {
                     const eq = document.getElementById('equipment_id') || document.querySelector('[name="equipment_id"]');
                     if (eq) {
                         eq.value = id;
+                        setFieldValue('date_needed', from);
+                        setFieldValue('expected_return_date', to);
                         eq.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         return false;
                     }

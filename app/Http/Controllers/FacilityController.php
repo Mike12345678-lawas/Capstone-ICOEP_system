@@ -53,6 +53,14 @@ class FacilityController extends Controller
             ->orderBy('time_start')
             ->get();
 
+        $myReservations = $facility->reservations()
+            ->where('user_id', Auth::id())
+            ->where('reservation_date', '>=', now()->toDateString())
+            ->whereIn('status', ['pending', 'approved'])
+            ->orderBy('reservation_date')
+            ->orderBy('time_start')
+            ->get();
+
         return view('facilities.show', [
             'pageTitle' => $facility->name,
             'breadcrumb' => [
@@ -60,8 +68,9 @@ class FacilityController extends Controller
                 ['label' => 'Facilities', 'url' => '/dashboard?section=facilities'],
                 ['label' => $facility->name],
             ],
-            'facility'     => $facility,
-            'reservations' => $reservations,
+            'facility'       => $facility,
+            'reservations'   => $reservations,
+            'myReservations' => $myReservations,
         ]);
     }
 
@@ -105,6 +114,9 @@ class FacilityController extends Controller
                             'label'       => $s['label'] ?? "{$s['name']} ({$s['location']})",
                             'facility_id' => $s['facility_id'] ?? $s['id'] ?? null,
                             'name'        => $s['name'] ?? null,
+                            'date'        => $s['date'] ?? null,
+                            'start'       => $s['start'] ?? null,
+                            'end'         => $s['end'] ?? null,
                         ];
                     }
                 }
@@ -116,12 +128,12 @@ class FacilityController extends Controller
         }
 
         if ($result['status'] === 'approved') {
-            return redirect('/facilities/' . $facility->id)
-                ->with('success', $result['message'] ?? 'Reservation automatically approved — no conflicts found.');
+            return redirect('/dashboard?section=booked-facilities')
+                ->with('success', $result['message'] ?? 'Facility reservation approved! You can view and manage your booked facilities below.');
         }
 
-        return redirect('/facilities/' . $facility->id)
-            ->with('success', 'Reservation request submitted successfully. Waiting for admin approval.');
+        return redirect('/dashboard?section=booked-facilities')
+            ->with('success', 'Facility reservation request submitted successfully! Your booking is displayed below.');
     }
 
     // ─── Admin Management ───
@@ -303,6 +315,64 @@ class FacilityController extends Controller
         return back()->with($failures ? 'error' : 'success', $msg);
     }
 
+    /**
+     * Auto-resolve all pending facility reservations using deterministic priority rules.
+     * Only applies to facility bookings (equipment requests require manual admin approval).
+     */
+    public function autoResolveAll(Request $request)
+    {
+        $pendingReservations = FacilityReservation::where('status', 'pending')
+            ->with(['user.role', 'facility'])
+            ->get()
+            ->sort(function ($a, $b) {
+                $tierA = ResourceSolver::getUserPriority($a->user);
+                $tierB = ResourceSolver::getUserPriority($b->user);
+                if ($tierA !== $tierB) {
+                    return $tierA <=> $tierB;
+                }
+                $timeCmp = $a->created_at <=> $b->created_at;
+                if ($timeCmp !== 0) {
+                    return $timeCmp;
+                }
+                return $a->id <=> $b->id;
+            });
+
+        $stats = ['approved' => 0, 'rejected' => 0, 'pending' => 0];
+
+        foreach ($pendingReservations as $reservation) {
+            $result = ResourceSolver::autoResolveFacilityReservation($reservation);
+            $status = $result['status'] ?? 'pending';
+            if (isset($stats[$status])) {
+                $stats[$status]++;
+            }
+        }
+
+        $msgParts = [];
+        if ($stats['approved'] > 0) {
+            $msgParts[] = "{$stats['approved']} automatically approved";
+        }
+        if ($stats['rejected'] > 0) {
+            $msgParts[] = "{$stats['rejected']} automatically rejected";
+        }
+        if ($stats['pending'] > 0) {
+            $msgParts[] = "{$stats['pending']} remained pending";
+        }
+
+        $message = empty($msgParts)
+            ? 'No pending facility reservations found to auto-resolve.'
+            : 'Facility automation complete: ' . implode(', ', $msgParts) . '.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'stats'   => $stats,
+                'message' => $message,
+            ]);
+        }
+
+        return back()->with('success', $message);
+    }
+
     // ─── User Cancel Own Pending Reservation ───
 
     public function cancelOwn(Request $request, FacilityReservation $reservation)
@@ -326,4 +396,36 @@ class FacilityController extends Controller
         }
         return back()->with('success', 'Reservation cancelled.');
     }
+
+    /**
+     * User / Admin action: Complete a facility reservation early and free the facility,
+     * immediately turning its state from Occupied to Open.
+     */
+    public function complete(Request $request, FacilityReservation $reservation)
+    {
+        $user = Auth::user();
+        if ($reservation->user_id !== $user->id && !$user->hasPermission('facility.approve')) {
+            abort(403, 'Unauthorized.');
+        }
+
+        if (!in_array($reservation->status, ['approved', 'pending'])) {
+            return back()->with('error', 'Only active or approved reservations can be completed.');
+        }
+
+        $now = \Illuminate\Support\Carbon::now();
+        $reservation->update([
+            'status'   => 'completed',
+            'time_end' => $now->format('H:i:s'),
+            'remarks'  => trim(($reservation->remarks ? $reservation->remarks . ' | ' : '') . 'Completed & facility freed to open at ' . $now->format('g:i A')),
+        ]);
+
+        AuditLog::log('FACILITY_FREED_OPEN', 'facility_reservations', $reservation->id);
+
+        $msg = "Facility \"{$reservation->facility->name}\" is now open and available for use.";
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => $msg]);
+        }
+        return redirect('/dashboard?section=booked-facilities')->with('success', $msg);
+    }
 }
+

@@ -36,9 +36,12 @@ class DashboardController extends Controller
 
         // Load section-specific data
         match ($section) {
-            'facilities'       => $this->loadFacilities($data, $request),
-            'equipment'        => $this->loadEquipment($data, $request),
-            'events'           => $this->loadEvents($data, $request, $user),
+            'facilities'                         => $this->loadFacilities($data, $request),
+            'equipment'                          => $this->loadEquipment($data, $request),
+            'booked-facilities', 'my-bookings'   => $this->loadBookedFacilities($data, $request, $user),
+            'borrowed-equipment', 'my-equipment' => $this->loadBorrowedEquipment($data, $request, $user),
+            'history'                            => $this->loadHistory($data, $request, $user),
+            'events'                             => $this->loadEvents($data, $request, $user),
             'announcements'    => $this->loadAnnouncements($data, $request),
             'users'            => $this->loadUsers($data, $request, $user),
             'inventory'        => $this->loadInventory($data, $request, $user),
@@ -127,6 +130,18 @@ class DashboardController extends Controller
 
         $data['facilities']   = $query->orderBy('name')->paginate(15);
         $data['statusFilter'] = $status;
+
+        // Facilities occupied right now by an approved booking (others are open)
+        $data['occupiedMap'] = FacilityReservation::ongoing()
+            ->whereIn('facility_id', $data['facilities']->pluck('id'))
+            ->get()
+            ->keyBy('facility_id');
+
+        $data['myActiveReservations'] = FacilityReservation::where('user_id', Auth::id())
+            ->with('facility')
+            ->whereIn('status', ['pending', 'approved'])
+            ->notEnded()
+            ->get();
     }
 
     // ─── EQUIPMENT ───────────────────────────────────────────────────────
@@ -146,6 +161,217 @@ class DashboardController extends Controller
         $data['equipment']      = $query->orderBy('name')->paginate(15);
         $data['categories']     = Equipment::select('category')->distinct()->pluck('category');
         $data['categoryFilter'] = $category;
+
+        $data['myActiveEquipment'] = EquipmentRequest::where('user_id', Auth::id())
+            ->with('equipment')
+            ->active()
+            ->latest()
+            ->get();
+    }
+
+    // ─── BOOKED FACILITIES (User's & Campus Bookings) ───────────────────
+
+    protected function loadBookedFacilities(array &$data, Request $request, $user): void
+    {
+        $status         = $request->get('status', '');
+        $isAdminOrStaff = $user->hasPermission('facility.approve') || $user->hasPermission('equipment.approve');
+        $defaultScope   = $isAdminOrStaff ? 'all' : 'my';
+        $scope          = $request->get('scope', $defaultScope);
+
+        $applySearch = function ($query) use ($data) {
+            if ($data['search']) {
+                $query->where(function ($q) use ($data) {
+                    $q->where('title', 'like', "%{$data['search']}%")
+                      ->orWhere('description', 'like', "%{$data['search']}%")
+                      ->orWhereHas('facility', fn($fq) => $fq->where('name', 'like', "%{$data['search']}%"))
+                      ->orWhereHas('user', function ($uq) use ($data) {
+                          $uq->where('first_name', 'like', "%{$data['search']}%")
+                             ->orWhere('last_name', 'like', "%{$data['search']}%")
+                             ->orWhere('employee_id', 'like', "%{$data['search']}%");
+                      });
+                });
+            }
+            return $query;
+        };
+
+        // Current: pending or approved bookings whose time has not ended yet
+        $current = FacilityReservation::with(['facility', 'user']);
+        if ($scope === 'my') {
+            $current->where('user_id', $user->id);
+        }
+        $current->whereIn('status', ['pending', 'approved'])->notEnded();
+        $applySearch($current);
+        if (in_array($status, ['pending', 'approved'], true)) {
+            $current->where('status', $status);
+        }
+
+        // Completed: approved bookings whose time has ended OR status is completed (facility is open again)
+        $completed = FacilityReservation::with(['facility', 'user']);
+        if ($scope === 'my') {
+            $completed->where('user_id', $user->id);
+        }
+        $completed->where(function ($q) {
+            $q->where('status', 'completed')
+              ->orWhere(function ($q2) {
+                  $q2->where('status', 'approved')->ended();
+              });
+        });
+        $applySearch($completed);
+
+        $data['myReservationsList']    = $current->orderBy('reservation_date')->orderBy('time_start')
+            ->paginate(10, ['*'], 'page');
+        $data['completedReservations'] = $completed->orderByDesc('reservation_date')->orderByDesc('time_start')
+            ->paginate(10, ['*'], 'completed_page');
+        $data['statusFilter']          = $status;
+        $data['scope']                 = $scope;
+        $data['canViewAll']            = true;
+    }
+
+    // ─── BORROWED EQUIPMENT (User's & Campus Requests) ───────────────────
+
+    protected function loadBorrowedEquipment(array &$data, Request $request, $user): void
+    {
+        $status         = $request->get('status', '');
+        $isAdminOrStaff = $user->hasPermission('equipment.approve') || $user->hasPermission('facility.approve');
+        $defaultScope   = $isAdminOrStaff ? 'all' : 'my';
+        $scope          = $request->get('scope', $defaultScope);
+
+        $applySearch = function ($query) use ($data) {
+            if ($data['search']) {
+                $query->where(function ($q) use ($data) {
+                    $q->where('purpose', 'like', "%{$data['search']}%")
+                      ->orWhereHas('equipment', fn($eq) => $eq->where('name', 'like', "%{$data['search']}%"))
+                      ->orWhereHas('user', function ($uq) use ($data) {
+                          $uq->where('first_name', 'like', "%{$data['search']}%")
+                             ->orWhere('last_name', 'like', "%{$data['search']}%")
+                             ->orWhere('employee_id', 'like', "%{$data['search']}%");
+                      });
+                });
+            }
+            return $query;
+        };
+
+        // Current: pending / approved / borrowed
+        $current = EquipmentRequest::with(['equipment', 'user']);
+        if ($scope === 'my') {
+            $current->where('user_id', $user->id);
+        }
+
+        if ($status === 'borrowed') {
+            $current->whereIn('status', ['borrowed', 'approved']);
+        } elseif ($status === 'rejected') {
+            $current->where('status', 'rejected');
+        } elseif (in_array($status, EquipmentRequest::ACTIVE_STATUSES, true)) {
+            $current->where('status', $status);
+        } else {
+            $current->whereIn('status', ['borrowed', 'approved', 'pending']);
+        }
+        $applySearch($current);
+
+        // Returned equipment (confirmed by staff)
+        $returned = EquipmentRequest::with(['equipment', 'user', 'confirmedBy'])->returned();
+        if ($scope === 'my') {
+            $returned->where('user_id', $user->id);
+        }
+        $applySearch($returned);
+
+        $data['myEquipmentList']   = $current->orderByDesc('created_at')->paginate(10, ['*'], 'page');
+        $data['returnedEquipment'] = $returned->orderByDesc('returned_at')->paginate(10, ['*'], 'returned_page');
+        $data['statusFilter']      = $status;
+        $data['scope']             = $scope;
+        $data['canViewAll']        = true;
+    }
+
+    // ─── HISTORY (Borrowed Equipment & Booked Facilities) ──────────────────
+
+    /**
+     * History of borrowed equipment & booked facilities for all users.
+     * Users can also filter by scope=my to see only their own history.
+     */
+    protected function loadHistory(array &$data, Request $request, $user): void
+    {
+        $tab    = $request->get('tab') === 'facilities' ? 'facilities' : 'equipment';
+        $status = $request->get('status', '');
+        $from   = $request->get('from', '');
+        $to     = $request->get('to', '');
+        $scope  = $request->get('scope', 'all'); // 'all' or 'my'
+        $search = $data['search'];
+
+        // Everyone can view campus-wide history as requested ("history for all user")
+        $canViewAll = true;
+
+        $userSearch = function ($q) use ($search) {
+            $q->where('first_name', 'like', "%{$search}%")
+              ->orWhere('last_name', 'like', "%{$search}%")
+              ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', "%{$search}%")
+              ->orWhere('employee_id', 'like', "%{$search}%");
+        };
+
+        if ($tab === 'equipment') {
+            $query = EquipmentRequest::with(['equipment', 'user', 'confirmedBy']);
+            if ($scope === 'my') {
+                $query->where('user_id', $user->id);
+            }
+            if ($search) {
+                $query->where(function ($q) use ($search, $canViewAll, $userSearch) {
+                    $q->where('purpose', 'like', "%{$search}%")
+                      ->orWhereHas('equipment', fn($eq) => $eq->where('name', 'like', "%{$search}%"));
+                    if ($canViewAll) {
+                        $q->orWhereHas('user', $userSearch);
+                    }
+                });
+            }
+            if ($status) {
+                $query->where('status', $status);
+            }
+            if ($from) {
+                $query->whereDate('date_needed', '>=', $from);
+            }
+            if ($to) {
+                $query->whereDate('date_needed', '<=', $to);
+            }
+            $data['historyItems'] = $query->orderByDesc('created_at')->paginate(20);
+        } else {
+            $query = FacilityReservation::with(['facility', 'user']);
+            if ($scope === 'my') {
+                $query->where('user_id', $user->id);
+            }
+            if ($search) {
+                $query->where(function ($q) use ($search, $canViewAll, $userSearch) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhereHas('facility', fn($fq) => $fq->where('name', 'like', "%{$search}%"));
+                    if ($canViewAll) {
+                        $q->orWhereHas('user', $userSearch);
+                    }
+                });
+            }
+            if ($status === 'completed') {
+                $query->where(function ($q) {
+                    $q->where('status', 'completed')
+                      ->orWhere(function ($q2) {
+                          $q2->where('status', 'approved')->ended();
+                      });
+                });
+            } elseif ($status === 'upcoming') {
+                $query->where('status', 'approved')->notEnded();
+            } elseif ($status) {
+                $query->where('status', $status);
+            }
+            if ($from) {
+                $query->whereDate('reservation_date', '>=', $from);
+            }
+            if ($to) {
+                $query->whereDate('reservation_date', '<=', $to);
+            }
+            $data['historyItems'] = $query->orderByDesc('reservation_date')->orderByDesc('time_start')->paginate(20);
+        }
+
+        $data['historyTab']   = $tab;
+        $data['canViewAll']   = $canViewAll;
+        $data['historyScope'] = $scope;
+        $data['statusFilter'] = $status;
+        $data['dateFrom']     = $from;
+        $data['dateTo']       = $to;
     }
 
     // ─── EVENTS ──────────────────────────────────────────────────────────
@@ -193,7 +419,8 @@ class DashboardController extends Controller
         }
 
         $query = User::with(['role', 'department'])->whereNull('deleted_at');
-        $role  = $request->get('role', '');
+        $role   = $request->get('role', '');
+        $status = $request->get('status', '');
 
         if ($data['search']) {
             $query->where(function ($q) use ($data) {
@@ -206,10 +433,18 @@ class DashboardController extends Controller
         if ($role) {
             $query->where('role_id', $role);
         }
+        if ($status === 'inactive_auto') {
+            $query->where('status', 'inactive')->where('deactivation_reason', 'inactivity');
+        } elseif ($status === 'inactive_admin') {
+            $query->where('status', 'inactive')->where('deactivation_reason', 'admin');
+        } elseif ($status) {
+            $query->where('status', $status);
+        }
 
-        $data['users']      = $query->latest()->paginate(15);
-        $data['roles']      = Role::all();
-        $data['roleFilter'] = $role;
+        $data['users']        = $query->latest()->paginate(15);
+        $data['roles']        = Role::all();
+        $data['roleFilter']   = $role;
+        $data['statusFilter'] = $status;
     }
 
     // ─── INVENTORY (Admin CRUD) ──────────────────────────────────────────

@@ -16,6 +16,7 @@ class User extends Authenticatable
         'id_type', 'employee_id', 'first_name', 'last_name', 'email', 'password',
         'role_id', 'department_id', 'phone', 'avatar', 'status',
         'login_attempts', 'locked_until', 'last_login',
+        'last_activity_at', 'deactivated_at', 'deactivation_reason', 'inactivity_warned_at',
         'privacy_consent', 'privacy_consent_date',
     ];
 
@@ -29,6 +30,9 @@ class User extends Authenticatable
             'privacy_consent_date' => 'datetime',
             'last_login'           => 'datetime',
             'locked_until'         => 'datetime',
+            'last_activity_at'     => 'datetime',
+            'deactivated_at'       => 'datetime',
+            'inactivity_warned_at' => 'datetime',
             'id_type'              => \App\Enums\UserIdType::class,
         ];
     }
@@ -114,6 +118,21 @@ class User extends Authenticatable
     public function isLocked(): bool
     {
         return $this->status === 'locked' && $this->locked_until && $this->locked_until->isFuture();
+    }
+
+    public function isAutoDeactivated(): bool
+    {
+        return $this->status === 'inactive' && $this->deactivation_reason === 'inactivity';
+    }
+
+    public function getReferenceAccessTime(): \Carbon\Carbon
+    {
+        return app(\App\Services\InactivityService::class)->getReferenceTime($this);
+    }
+
+    public function isDormant(?int $days = null): bool
+    {
+        return app(\App\Services\InactivityService::class)->isDormant($this, $days);
     }
 
     // ─── Scopes ───

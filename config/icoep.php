@@ -9,10 +9,11 @@ return [
     'items_per_page'    => 15,
     'max_login_attempts'=> 5,
     'lockout_minutes'   => 30,
+    'block_borrowing_after_days_overdue' => env('BLOCK_BORROWING_AFTER_DAYS_OVERDUE', 3),
 
     // ─── Rule-Based Deterministic Auto-Approval ─────────────────────────
-    // Enabled by default for all roles with role-based priority & preemption.
-    // When enabled, requests resolve deterministically (approve/reject/pending).
+    // Enabled by default for facilities ONLY with role-based priority & preemption.
+    // Note: Equipment requests require manual admin approval (auto-approval is facility-only).
 
     'auto_approve' => [
         'facility' => [
@@ -20,10 +21,10 @@ return [
             // Roles whose requests may be auto-approved
             'allowed_roles'            => ['Administrator', 'Faculty', 'Staff', 'Student'],
             // Operating window — requests outside this window stay pending
-            'operating_start'          => '07:00', // 7 AM
-            'operating_end'            => '20:00', // 8 PM
+            'operating_start'          => env('AUTO_APPROVE_FACILITY_OP_START', '06:00'),
+            'operating_end'            => env('AUTO_APPROVE_FACILITY_OP_END', '23:00'),
             // Maximum allowed duration in hours (0 = no limit)
-            'max_duration_hours'       => 8,
+            'max_duration_hours'       => env('AUTO_APPROVE_FACILITY_MAX_HOURS', 0),
             // Roles that can be preempted by higher priority tiers
             'preemptible_roles'        => ['Student'],
             // Minimum hours before booking start required to permit preemption
@@ -33,15 +34,21 @@ return [
         ],
 
         'equipment' => [
-            'enabled'                  => env('AUTO_APPROVE_EQUIPMENT', true),
-            // Roles whose requests may be auto-approved
-            'allowed_roles'            => ['Administrator', 'Faculty', 'Staff', 'Student'],
-            // Minimum units that must remain available after approving
-            'min_stock_buffer'         => 0,
-            // Roles that can be preempted by higher priority tiers
-            'preemptible_roles'        => ['Student'],
-            // Maximum suggestions to return on rejection/preemption
+            // Equipment auto-approval is disabled. Auto-approval is facilities only.
+            'enabled'                  => false,
             'max_suggestions'          => 5,
         ],
     ],
+
+    // ─── Automated Account Inactivity Deactivation ──────────────────────
+    'inactivity' => [
+        'days'                       => env('INACTIVITY_DAYS', 14),
+        'exempt_roles'               => ['Administrator'],
+        'protect_borrowed_equipment' => true,
+        'protect_upcoming_bookings'  => true,
+        'allow_self_reactivation'    => env('INACTIVITY_ALLOW_SELF_REACTIVATION', false),
+        'warn_days_before'           => env('INACTIVITY_WARN_DAYS_BEFORE', 2),
+        'activity_throttle_minutes'  => 10,
+    ],
 ];
+

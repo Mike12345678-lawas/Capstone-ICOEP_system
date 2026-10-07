@@ -27,23 +27,23 @@
                 <a href="{{ url('/dashboard?section=events&status=completed') }}" class="filter-btn {{ ($statusFilter ?? '') === 'completed' ? 'active' : '' }}">Completed</a>
             </div>
         </form>
-        <div class="table-responsive">
-            <table class="data-table">
+        <div class="table-responsive manage-table-responsive">
+            <table class="data-table mobile-cards">
                 <thead>
                     <tr><th>Title</th><th>Date</th><th>Venue</th><th>Type</th><th>Registered</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                 @forelse($events as $event)
                     <tr>
-                        <td style="font-weight: 600;">{{ $event->title }}</td>
-                        <td>{{ $event->event_date->format('M d, Y') }}</td>
-                        <td>{{ $event->venue ?: '—' }}</td>
-                        <td><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
-                        <td>{{ $event->registrations_count }}{{ $event->max_participants > 0 ? '/' . $event->max_participants : '' }}</td>
-                        <td>
+                        <td data-label="Title" style="font-weight: 600;">{{ $event->title }}</td>
+                        <td data-label="Date">{{ $event->event_date->format('M d, Y') }}</td>
+                        <td data-label="Venue">{{ $event->venue ?: '—' }}</td>
+                        <td data-label="Type"><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
+                        <td data-label="Registered">{{ $event->registrations_count }}{{ $event->max_participants > 0 ? '/' . $event->max_participants : '' }}</td>
+                        <td data-label="Status">
                             <x-status-badge :status="$event->status" />
                         </td>
-                        <td><a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm">View</a></td>
+                        <td data-label="Action" class="card-actions-cell"><a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">View Details</a></td>
                     </tr>
                 @empty
                     <tr>

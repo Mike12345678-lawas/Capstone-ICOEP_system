@@ -65,6 +65,33 @@
                     </svg>
                     <span>Equipment</span>
                 </a>
+
+                <a href="{{ url('/dashboard?section=booked-facilities') }}" class="nav-link {{ in_array($currentSection, ['booked-facilities', 'my-bookings']) ? 'active' : '' }}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    <span>Booked Facilities</span>
+                </a>
+
+                <a href="{{ url('/dashboard?section=borrowed-equipment') }}" class="nav-link {{ in_array($currentSection, ['borrowed-equipment', 'my-equipment']) ? 'active' : '' }}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Borrowed Equipment</span>
+                </a>
+
+                <a href="{{ url('/dashboard?section=history') }}" class="nav-link {{ $currentSection === 'history' ? 'active' : '' }}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3v5h5"></path>
+                        <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
+                        <polyline points="12 7 12 12 15 15"></polyline>
+                    </svg>
+                    <span>History</span>
+                </a>
             </div>
         </div>
 
@@ -120,12 +147,20 @@
                 @endif
 
                 @if(auth()->user()->hasPermission('equipment.approve'))
-                <a href="{{ url('/dashboard?section=manage-equipment') }}" class="nav-link {{ $currentSection === 'manage-equipment' ? 'active' : '' }}">
+                <a href="{{ url('/dashboard?section=manage-equipment') }}" class="nav-link {{ ($currentSection ?? '') === 'manage-equipment' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
                         <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
                     </svg>
                     <span>Equipment Requests</span>
+                </a>
+
+                <a href="{{ url('/equipment/returns') }}" class="nav-link {{ request()->is('equipment/returns*') ? 'active' : '' }}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    <span>Equipment Returns</span>
                 </a>
                 @endif
 

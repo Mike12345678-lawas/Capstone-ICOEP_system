@@ -42,16 +42,16 @@
         </div>
 
         <div class="table-responsive">
-            <table class="data-table">
+            <table class="data-table mobile-cards">
                 <thead><tr><th scope="col">Facility</th><th scope="col">Total Reservations</th><th scope="col">Approved</th><th scope="col">Usage Rate</th></tr></thead>
                 <tbody>
                 @forelse($facilityStats ?? [] as $stat)
                     @php $pct = $stat->total > 0 ? round(($stat->approved / $stat->total) * 100) : 0; @endphp
                     <tr>
-                        <td class="font-semibold">{{ $stat->facility->name ?? '—' }}</td>
-                        <td>{{ $stat->total }}</td>
-                        <td>{{ $stat->approved }}</td>
-                        <td>
+                        <td data-label="Facility" class="font-semibold">{{ $stat->facility->name ?? '—' }}</td>
+                        <td data-label="Total Reservations">{{ $stat->total }}</td>
+                        <td data-label="Approved">{{ $stat->approved }}</td>
+                        <td data-label="Usage Rate">
                             <div class="progress-bar-wrapper">
                                 <div class="progress-bar-track">
                                     <div class="progress-bar-fill progress-bar-fill-brand" style="width: {{ $pct }}%;"></div>
@@ -140,18 +140,18 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
 
         <div class="table-responsive">
-            <table class="data-table">
+            <table class="data-table mobile-cards">
                 <thead><tr><th scope="col">Event</th><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Registered</th><th scope="col">Capacity</th><th scope="col">Fill Rate</th></tr></thead>
                 <tbody>
                 @forelse($eventStats ?? [] as $ev)
                     @php $rate = ($ev->max_participants > 0) ? round(($ev->registrations_count / $ev->max_participants) * 100) : 0; @endphp
                     <tr>
-                        <td class="font-semibold">{{ $ev->title }}</td>
-                        <td>{{ $ev->event_date->format('M d, Y') }}</td>
-                        <td><span class="badge badge-general">{{ ucfirst($ev->event_type) }}</span></td>
-                        <td>{{ $ev->registrations_count }}</td>
-                        <td>{{ $ev->max_participants > 0 ? $ev->max_participants : '∞' }}</td>
-                        <td>
+                        <td data-label="Event" class="font-semibold">{{ $ev->title }}</td>
+                        <td data-label="Date">{{ $ev->event_date->format('M d, Y') }}</td>
+                        <td data-label="Type"><span class="badge badge-general">{{ ucfirst($ev->event_type) }}</span></td>
+                        <td data-label="Registered">{{ $ev->registrations_count }}</td>
+                        <td data-label="Capacity">{{ $ev->max_participants > 0 ? $ev->max_participants : '∞' }}</td>
+                        <td data-label="Fill Rate">
                             <div class="progress-bar-wrapper">
                                 <div class="progress-bar-track">
                                     <div class="progress-bar-fill progress-bar-fill-success" style="width: {{ min($rate, 100) }}%;"></div>
@@ -230,17 +230,17 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </form>
         <div class="table-responsive">
-            <table class="data-table">
+            <table class="data-table mobile-cards">
                 <thead><tr><th scope="col">User</th><th scope="col">Action</th><th scope="col">Table</th><th scope="col">Record ID</th><th scope="col">IP Address</th><th scope="col">Date</th></tr></thead>
                 <tbody>
                 @forelse($auditLogs ?? [] as $log)
                     <tr>
-                        <td class="font-semibold">{{ $log->user->full_name ?? 'System' }}</td>
-                        <td><code>{{ $log->action }}</code></td>
-                        <td>{{ $log->table_name }}</td>
-                        <td>{{ $log->record_id ?: '—' }}</td>
-                        <td><code>{{ $log->ip_address }}</code></td>
-                        <td>{{ $log->created_at->format('M d, Y H:i') }}</td>
+                        <td data-label="User" class="font-semibold">{{ $log->user->full_name ?? 'System' }}</td>
+                        <td data-label="Action"><code>{{ $log->action }}</code></td>
+                        <td data-label="Table">{{ $log->table_name }}</td>
+                        <td data-label="Record ID">{{ $log->record_id ?: '—' }}</td>
+                        <td data-label="IP Address"><code>{{ $log->ip_address }}</code></td>
+                        <td data-label="Date">{{ $log->created_at->format('M d, Y H:i') }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="text-center text-muted empty-table-cell">No audit logs found.</td></tr>

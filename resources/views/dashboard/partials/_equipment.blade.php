@@ -3,7 +3,29 @@
         <h1 class="page-title">Equipment Inventory</h1>
         <p class="page-subtitle">Browse available equipment for borrowing.</p>
     </div>
+    <div>
+        <a href="{{ url('/dashboard?section=borrowed-equipment') }}" class="btn btn-primary btn-sm">
+            📦 My Borrowed Equipment
+        </a>
+    </div>
 </div>
+
+@if(isset($myActiveEquipment) && $myActiveEquipment->isNotEmpty())
+<div class="card animate-fade-in-up" style="animation-delay: 50ms; margin-bottom: 1rem; border-left: 4px solid var(--color-brand-500, #0ea5e9); background: rgba(14, 165, 233, 0.04);">
+    <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; flex-wrap: wrap; gap: .75rem;">
+        <div>
+            <strong>📦 You have {{ $myActiveEquipment->count() }} active equipment request(s) / borrowed item(s):</strong>
+            <span class="text-muted" style="margin-left: .5rem; font-size: .85rem;">
+                {{ $myActiveEquipment->take(3)->map(fn($r) => $r->equipment->name . ' (' . ucfirst($r->status) . ')')->join(', ') }}
+                @if($myActiveEquipment->count() > 3) and more... @endif
+            </span>
+        </div>
+        <a href="{{ url('/dashboard?section=borrowed-equipment') }}" class="btn btn-primary btn-sm" style="font-size: .8rem;">
+            Manage &amp; Return Equipment &rarr;
+        </a>
+    </div>
+</div>
+@endif
 <div class="card animate-fade-in-up" style="animation-delay: 100ms;">
     <div class="card-body">
         <form method="GET" action="{{ url('/dashboard') }}" class="search-bar" style="margin-bottom: 1rem;">
@@ -19,23 +41,23 @@
                 @endforeach
             </div>
         </form>
-        <div class="table-responsive">
-            <table class="data-table">
+        <div class="table-responsive manage-table-responsive">
+            <table class="data-table mobile-cards">
                 <thead>
                     <tr><th>Name</th><th>Category</th><th>Available / Total</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                 @forelse($equipment as $item)
                     <tr>
-                        <td style="font-weight: 600;">{{ $item->name }}</td>
-                        <td><span class="badge badge-general">{{ $item->category }}</span></td>
-                        <td>{{ $item->available_quantity }} / {{ $item->quantity }}</td>
-                        <td>
+                        <td data-label="Name" style="font-weight: 600;">{{ $item->name }}</td>
+                        <td data-label="Category"><span class="badge badge-general">{{ $item->category }}</span></td>
+                        <td data-label="Available / Total">{{ $item->available_quantity }} / {{ $item->quantity }}</td>
+                        <td data-label="Status">
                             <span class="badge {{ $item->available_quantity > 0 ? 'badge-success' : 'badge-error' }}">
                                 {{ $item->available_quantity > 0 ? 'Available' : 'Unavailable' }}
                             </span>
                         </td>
-                        <td><a href="{{ url('/equipment/' . $item->id) }}" class="btn btn-secondary btn-sm">View</a></td>
+                        <td data-label="Action" class="card-actions-cell"><a href="{{ url('/equipment/' . $item->id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">View Details</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="text-center text-muted" style="padding: 2rem;">No equipment found.</td></tr>

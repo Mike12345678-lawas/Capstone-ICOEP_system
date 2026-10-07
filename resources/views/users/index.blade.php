@@ -25,11 +25,14 @@
                 @foreach($roles as $r)
                     <a href="{{ url('/users?role=' . $r->id) }}" class="filter-btn {{ $roleFilter == $r->id ? 'active' : '' }}">{{ $r->name }}</a>
                 @endforeach
+                <a href="{{ url('/users?status=inactive_auto') }}" class="filter-btn {{ ($statusFilter ?? '') === 'inactive_auto' ? 'active' : '' }}" title="Accounts auto-deactivated due to inactivity">
+                    ⚡ Auto-Deactivated
+                </a>
             </div>
         </form>
         <div class="table-responsive">
             <table class="table">
-                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Last Activity</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                 @forelse($users as $u)
                     <tr>
@@ -46,8 +49,30 @@
                         <td><span class="badge badge-general">{{ $u->role->name }}</span></td>
                         <td>{{ $u->department?->name ?: '—' }}</td>
                         <td>
-                            @php $badge = match($u->status) { 'active' => 'badge-success', 'locked' => 'badge-error', default => 'badge-warning' }; @endphp
-                            <span class="badge {{ $badge }}">{{ ucfirst($u->status) }}</span>
+                            @if($u->last_activity_at)
+                                <span title="{{ $u->last_activity_at->format('M d, Y h:i A') }}">{{ $u->last_activity_at->diffForHumans() }}</span>
+                            @elseif($u->last_login)
+                                <span title="{{ $u->last_login->format('M d, Y h:i A') }}">{{ $u->last_login->diffForHumans() }} (login)</span>
+                            @else
+                                <span class="text-muted">Never</span>
+                            @endif
+                        </td>
+                        <td>
+                            @php
+                                $badge = $u->status === 'active' ? 'badge-success' : 'badge-warning';
+                            @endphp
+                            <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                                <span class="badge {{ $badge }}">{{ ucfirst($u->status) }}</span>
+                                @if($u->status === 'inactive')
+                                    @if($u->deactivation_reason === 'inactivity')
+                                        <span class="badge badge-error" style="font-size: .65rem; padding: 1px 6px;" title="Auto-deactivated after {{ config('icoep.inactivity.days', 14) }} days of inactivity">
+                                            Auto: no access for {{ config('icoep.inactivity.days', 14) }} days
+                                        </span>
+                                    @elseif($u->deactivation_reason === 'admin')
+                                        <span class="text-muted" style="font-size: .75rem;">By admin</span>
+                                    @endif
+                                @endif
+                            </div>
                         </td>
                         <td>
                             <div class="btn-group">
@@ -62,7 +87,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted" style="padding: 2rem;">No users found.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted" style="padding: 2rem;">No users found.</td></tr>
                 @endforelse
                 </tbody>
             </table>

@@ -31,4 +31,44 @@ class NotificationController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Delete a single notification. Users may only delete their own.
+     */
+    public function destroy(Notification $notification)
+    {
+        abort_unless($notification->user_id === Auth::id(), 403);
+
+        $notification->delete();
+
+        return $this->counts();
+    }
+
+    /**
+     * Delete all of the current user's notifications.
+     * Pass ?only=read to clear only already-read notifications.
+     */
+    public function destroyAll(Request $request)
+    {
+        $query = Auth::user()->notifications();
+
+        if ($request->query('only') === 'read') {
+            $query->where('is_read', true);
+        }
+
+        $deleted = $query->delete();
+
+        return $this->counts(['deleted' => $deleted]);
+    }
+
+    private function counts(array $extra = [])
+    {
+        $user = Auth::user();
+
+        return response()->json(array_merge([
+            'success'      => true,
+            'unread_count' => $user->notifications()->unread()->count(),
+            'total_count'  => $user->notifications()->count(),
+        ], $extra));
+    }
 }

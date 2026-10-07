@@ -17,20 +17,23 @@
     <div class="notification-dropdown" id="notificationDropdown">
         <div class="notif-header">
             <h4>Notifications</h4>
-            @if($unreadCount > 0)
-                <a href="#" id="markAllRead" class="notif-mark-all">Mark all read</a>
-            @endif
+            <div class="notif-actions" id="notifActions" @if($notifications->isEmpty()) style="display:none;" @endif>
+                @if($unreadCount > 0)
+                    <button type="button" id="markAllRead" class="notif-action-btn notif-mark-all" title="Mark all as read">Mark all read</button>
+                @endif
+                <button type="button" id="deleteAllNotifs" class="notif-action-btn notif-delete-all" title="Delete all notifications">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+                    Clear all
+                </button>
+            </div>
         </div>
         <div class="notif-list" id="notifList">
-            @if($notifications->isEmpty())
-                <div class="notif-empty">
-                    <p>No notifications yet</p>
-                </div>
-            @else
-                @foreach($notifications as $notif)
-                    <a href="{{ $notif->link ? url($notif->link) : '#' }}"
-                       class="notif-item {{ !$notif->is_read ? 'unread' : '' }}"
-                       data-id="{{ $notif->id }}">
+            <div class="notif-empty" id="notifEmpty" @if($notifications->isNotEmpty()) style="display:none;" @endif>
+                <p>No notifications yet</p>
+            </div>
+            @foreach($notifications as $notif)
+                <div class="notif-item {{ !$notif->is_read ? 'unread' : '' }}" data-id="{{ $notif->id }}">
+                    <a href="{{ $notif->link ? url($notif->link) : '#' }}" class="notif-item-link">
                         <div class="notif-icon notif-{{ $notif->type }}">
                             @if($notif->type === 'success')
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -48,8 +51,11 @@
                             <span class="notif-time">{{ $notif->created_at->diffForHumans() }}</span>
                         </div>
                     </a>
-                @endforeach
-            @endif
+                    <button type="button" class="notif-delete-single" data-id="{{ $notif->id }}" aria-label="Delete notification" title="Delete">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            @endforeach
         </div>
     </div>
 </div>

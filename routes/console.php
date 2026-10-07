@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\CheckOverdueEquipment;
+use App\Console\Commands\DeactivateInactiveUsers;
 use App\Console\Commands\ExpirePendingRequests;
 use App\Console\Commands\SendAutomatedReminders;
 use Illuminate\Foundation\Inspiring;
@@ -47,4 +48,19 @@ Schedule::command(\App\Console\Commands\AutoResolveRequests::class)
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/auto_resolve.log'))
     ->description('Auto-resolve pending facility reservations and equipment requests based on deterministic priority rules');
+
+// Daily inactive user deactivation sweep — runs every day at 1:00 AM
+Schedule::command(\App\Console\Commands\DeactivateInactiveUsers::class)
+    ->dailyAt('01:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/inactive_users.log'))
+    ->description('Deactivate dormant user accounts after 14 days without access');
+
+// Daily notification cleanup — runs every day at 2:00 AM so inboxes never flood
+Schedule::command(\App\Console\Commands\PruneNotifications::class)
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/notification_prune.log'))
+    ->description('Delete old read notifications and cap each user inbox');
+
 

@@ -90,7 +90,7 @@ class DeterministicAutoResolveTest extends TestCase
             'time_start'       => '10:00',
             'time_end'         => '12:00',
         ]);
-        $res1->assertRedirect('/facilities/' . $facilityA->id);
+        $res1->assertRedirect('/dashboard?section=booked-facilities');
         $res1->assertSessionHas('success');
 
         $booking1 = FacilityReservation::where('user_id', $student1->id)->first();
@@ -313,6 +313,7 @@ class DeterministicAutoResolveTest extends TestCase
      */
     public function test_preemption_blocked_when_booking_starts_within_preempt_min_hours_before(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-10-01 08:00:00'));
         config(['icoep.auto_approve.facility.preempt_min_hours_before' => 24]);
 
         $student = $this->createUser('Student');
@@ -325,8 +326,8 @@ class DeterministicAutoResolveTest extends TestCase
             'status'   => 'available',
         ]);
 
-        // Student creates an approved reservation starting in 12 hours (within 24 hours of now)
-        $startIn12 = now()->addHours(12);
+        // Student creates an approved reservation starting in 5 hours (within 24 hours of now)
+        $startIn12 = Carbon::parse('2026-10-01 13:00:00');
         $studentBooking = FacilityReservation::create([
             'facility_id'      => $facility->id,
             'user_id'          => $student->id,
@@ -359,13 +360,13 @@ class DeterministicAutoResolveTest extends TestCase
     }
 
     /**
-     * 6. Equipment: stock restored correctly after preemption; borrowed items are never preempted.
+     * 6. Equipment: requests are NOT auto-approved (auto-approval is facility-only) and remain pending for admin.
      */
-    public function test_equipment_stock_restored_after_preemption_and_borrowed_items_never_preempted(): void
+    public function test_equipment_requests_are_not_auto_approved_and_remain_pending(): void
     {
-        $student1 = $this->createUser('Student');
-        $student2 = $this->createUser('Student');
-        $faculty  = $this->createUser('Faculty');
+        $student = $this->createUser('Student');
+        $faculty = $this->createUser('Faculty');
+        $admin   = $this->createUser('Administrator');
 
         $equipment = Equipment::create([
             'name'               => 'HDMI Projector A',
@@ -378,34 +379,31 @@ class DeterministicAutoResolveTest extends TestCase
         $dateNeeded     = now()->addDays(3)->toDateString();
         $expectedReturn = now()->addDays(5)->toDateString();
 
-        // Student 1 requests 1 unit -> auto-approved
-        $this->actingAs($student1);
-        $this->post("/equipment/{$equipment->id}/borrow", [
+        // Student requests 1 unit -> remains pending, stock NOT decremented
+        config(['icoep.auto_approve.equipment.enabled' => false]);
+        $this->actingAs($student);
+        $resStudent = $this->post("/equipment/{$equipment->id}/borrow", [
             'quantity'             => 1,
-            'purpose'              => 'Student 1 Presentation',
+            'purpose'              => 'Student Presentation',
             'date_needed'          => $dateNeeded,
             'expected_return_date' => $expectedReturn,
         ]);
-        $req1 = EquipmentRequest::where('user_id', $student1->id)->first();
-        $this->assertEquals('approved', $req1->status);
-        $this->assertEquals(1, $equipment->fresh()->available_quantity);
+        $resStudent->assertSessionHas('success');
+        $studentReq = EquipmentRequest::where('user_id', $student->id)->first();
+        $this->assertNotNull($studentReq);
+        $this->assertEquals('pending', $studentReq->status);
+        $this->assertEquals('Pending admin approval', $studentReq->remarks);
+        $this->assertNull($studentReq->approved_by);
+        // Stock must not be decremented upon request creation
+        $this->assertEquals(2, $equipment->fresh()->available_quantity);
 
-        // Student 1's equipment is already physically handed out (status = borrowed)
-        $req1->update(['status' => 'borrowed']);
-
-        // Student 2 requests remaining 1 unit -> auto-approved
-        $this->actingAs($student2);
-        $this->post("/equipment/{$equipment->id}/borrow", [
-            'quantity'             => 1,
-            'purpose'              => 'Student 2 Classwork',
-            'date_needed'          => $dateNeeded,
-            'expected_return_date' => $expectedReturn,
+        // Student receives pending notification
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $student->id,
+            'title'   => '⏳ Equipment Request Pending',
         ]);
-        $req2 = EquipmentRequest::where('user_id', $student2->id)->first();
-        $this->assertEquals('approved', $req2->status);
-        $this->assertEquals(0, $equipment->fresh()->available_quantity);
 
-        // Faculty requests 1 unit for the same dates
+        // Faculty requests 1 unit -> also remains pending (no auto-approval for equipment regardless of role)
         $this->actingAs($faculty);
         $resFaculty = $this->post("/equipment/{$equipment->id}/borrow", [
             'quantity'             => 1,
@@ -414,53 +412,24 @@ class DeterministicAutoResolveTest extends TestCase
             'expected_return_date' => $expectedReturn,
         ]);
         $resFaculty->assertSessionHas('success');
-
-        // Verification:
-        // Student 1 (borrowed) must NEVER be preempted
-        $this->assertEquals('borrowed', $req1->fresh()->status, 'Borrowed equipment must never be preempted.');
-
-        // Student 2 (approved) was preempted and cancelled
-        $this->assertEquals('cancelled', $req2->fresh()->status);
-        $this->assertStringContainsString('preempted', strtolower($req2->fresh()->remarks));
-
-        // Faculty is approved
         $facultyReq = EquipmentRequest::where('user_id', $faculty->id)->first();
-        $this->assertEquals('approved', $facultyReq->status);
+        $this->assertNotNull($facultyReq);
+        $this->assertEquals('pending', $facultyReq->status);
+        $this->assertEquals(2, $equipment->fresh()->available_quantity);
 
-        // Available quantity must be 0 (1 borrowed by student 1 + 1 approved for faculty)
-        $this->assertEquals(0, $equipment->fresh()->available_quantity);
-
-        // Student 2 received a notification with warning
-        $notif = Notification::where('user_id', $student2->id)->orderByDesc('id')->first();
-        $this->assertNotNull($notif);
-        $this->assertEquals('warning', $notif->type);
-
-        $this->assertDatabaseHas('audit_logs', [
-            'action'     => 'PREEMPTED_BORROW',
-            'table_name' => 'equipment_requests',
-            'record_id'  => $req2->id,
-        ]);
-
-        $this->assertDatabaseHas('audit_logs', [
+        // Neither request was auto-approved
+        $this->assertDatabaseMissing('audit_logs', [
             'action'     => 'AUTO_APPROVED_BORROW',
             'table_name' => 'equipment_requests',
-            'record_id'  => $facultyReq->id,
         ]);
 
-        // If another Faculty now requests 1 unit, they should be auto-rejected since 0 stock is available and no preemptible items remain
-        $faculty2 = $this->createUser('Faculty');
-        $this->actingAs($faculty2);
-        $resFac2 = $this->post("/equipment/{$equipment->id}/borrow", [
-            'quantity'             => 1,
-            'purpose'              => 'Faculty 2 Class',
-            'date_needed'          => $dateNeeded,
-            'expected_return_date' => $expectedReturn,
+        // Admin manually approves Student request
+        $this->actingAs($admin);
+        $this->patch("/equipment-requests/{$studentReq->id}/status", [
+            'status' => 'approved',
         ]);
-        $resFac2->assertSessionHas('error');
-
-        $fac2Req = EquipmentRequest::where('user_id', $faculty2->id)->first();
-        $this->assertNotNull($fac2Req);
-        $this->assertEquals('rejected', $fac2Req->status);
+        $this->assertEquals('approved', $studentReq->fresh()->status);
+        $this->assertEquals(1, $equipment->fresh()->available_quantity);
     }
 
     /**
@@ -526,10 +495,10 @@ class DeterministicAutoResolveTest extends TestCase
         // Now run without --dry-run
         Artisan::call('requests:auto-resolve');
 
-        // Verify items were processed and resolved
+        // Verify facility was auto-approved, while equipment remained pending (auto-approval is facility-only)
         $this->assertEquals('approved', $resPending->fresh()->status);
-        $this->assertEquals('approved', $eqPending->fresh()->status);
-        $this->assertEquals($stockBefore - 2, $equipment->fresh()->available_quantity);
+        $this->assertEquals('pending', $eqPending->fresh()->status);
+        $this->assertEquals($stockBefore, $equipment->fresh()->available_quantity);
 
         $this->assertDatabaseHas('audit_logs', [
             'action'     => 'AUTO_APPROVED_RESERVATION',
@@ -537,10 +506,117 @@ class DeterministicAutoResolveTest extends TestCase
             'record_id'  => $resPending->id,
         ]);
 
-        $this->assertDatabaseHas('audit_logs', [
+        $this->assertDatabaseMissing('audit_logs', [
             'action'     => 'AUTO_APPROVED_BORROW',
             'table_name' => 'equipment_requests',
             'record_id'  => $eqPending->id,
         ]);
     }
+
+    /**
+     * 8. Full-day facility booking (e.g. 08:05 to 17:00) is auto-approved immediately.
+     */
+    public function test_full_day_facility_reservation_is_auto_approved(): void
+    {
+        $student = $this->createUser('Student');
+        $facility = Facility::create([
+            'name'     => 'Audio-Visual Room',
+            'location' => 'Main Wing 2F',
+            'capacity' => 60,
+            'status'   => 'available',
+        ]);
+
+        $targetDate = now()->addDays(5)->toDateString();
+
+        $this->actingAs($student);
+        $res = $this->post("/facilities/{$facility->id}/reserve", [
+            'title'            => 'IT Department Annual Assembly',
+            'reservation_date' => $targetDate,
+            'time_start'       => '08:05',
+            'time_end'         => '17:00',
+        ]);
+
+        $res->assertRedirect('/dashboard?section=booked-facilities');
+        $res->assertSessionHas('success');
+
+        $booking = FacilityReservation::where('user_id', $student->id)
+            ->where('facility_id', $facility->id)
+            ->first();
+
+        $this->assertNotNull($booking);
+        $this->assertEquals('approved', $booking->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'action'     => 'AUTO_APPROVED_RESERVATION',
+            'table_name' => 'facility_reservations',
+            'record_id'  => $booking->id,
+        ]);
+    }
+
+    /**
+     * 9. Admin auto-resolve endpoint processes pending facility reservations only.
+     */
+    public function test_admin_auto_resolve_endpoint_processes_pending_facilities_only(): void
+    {
+        $admin = $this->createUser('Administrator');
+        $student = $this->createUser('Student');
+
+        $facility = Facility::create([
+            'name'     => 'Science Lab',
+            'location' => 'Building C',
+            'capacity' => 40,
+            'status'   => 'available',
+        ]);
+
+        $equipment = Equipment::create([
+            'name'               => 'Digital Projector',
+            'category'           => 'Electronics',
+            'quantity'           => 3,
+            'available_quantity' => 3,
+            'status'             => 'available',
+        ]);
+
+        $targetDate = now()->addDays(6)->toDateString();
+
+        $pendingFacility = FacilityReservation::create([
+            'facility_id'      => $facility->id,
+            'user_id'          => $student->id,
+            'title'            => 'Pending Club Meeting',
+            'reservation_date' => $targetDate,
+            'time_start'       => '13:00',
+            'time_end'         => '15:00',
+            'status'           => 'pending',
+            'remarks'          => 'Pending review',
+        ]);
+
+        $pendingEquipment = EquipmentRequest::create([
+            'equipment_id'         => $equipment->id,
+            'user_id'              => $student->id,
+            'quantity'             => 1,
+            'purpose'              => 'Pending Projector Request',
+            'date_needed'          => $targetDate,
+            'expected_return_date' => $targetDate,
+            'status'               => 'pending',
+            'remarks'              => 'Pending admin approval',
+        ]);
+
+        $this->actingAs($admin);
+        $response = $this->postJson('/facility-reservations/auto-resolve');
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'stats'   => [
+                'approved' => 1,
+                'rejected' => 0,
+                'pending'  => 0,
+            ],
+        ]);
+
+        // Facility is now approved
+        $this->assertEquals('approved', $pendingFacility->fresh()->status);
+
+        // Equipment remains pending (automation is facility only)
+        $this->assertEquals('pending', $pendingEquipment->fresh()->status);
+    }
 }
+

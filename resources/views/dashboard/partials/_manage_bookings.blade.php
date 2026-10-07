@@ -22,11 +22,19 @@
 {{-- ═══ TOAST ═══ --}}
 <div id="booking-toast" style="display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;padding:.75rem 1.25rem;border-radius:8px;font-size:.9rem;font-weight:600;color:#fff;box-shadow:0 4px 16px rgba(0,0,0,.18);"></div>
 
-<div class="page-header animate-fade-in-up">
+<div class="page-header animate-fade-in-up" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
     <div>
         <h1 class="page-title">Booking Requests</h1>
         <p class="page-subtitle">Review and approve or reject facility booking requests.</p>
     </div>
+    @if(auth()->user()->hasPermission('facility.approve'))
+    <div style="display: flex; gap: .5rem; align-items: center;">
+        <button id="run-auto-resolve-btn" class="btn btn-primary btn-sm" onclick="runFacilityAutomation(this)" style="display: inline-flex; align-items: center; gap: .4rem;" title="Automatically evaluate all pending facility reservations using deterministic priority and conflict rules">
+            <span>⚡</span>
+            <span>Run Facility Automation</span>
+        </button>
+    </div>
+    @endif
 </div>
 <div class="card animate-fade-in-up" style="animation-delay: 100ms;">
     <div class="card-body">
@@ -233,4 +241,31 @@ document.getElementById('bulk-approve-bookings-btn').addEventListener('click', f
     })
     .catch(() => { showToast('Network error', false); this.disabled = false; });
 });
+
+// ─── Run Facility Automation ───
+function runFacilityAutomation(btn) {
+    if (!confirm('Run deterministic facility booking automation on all pending requests?')) {
+        return;
+    }
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Processing...</span>';
+
+    fetch('/facility-reservations/auto-resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        showToast(data.message, data.success);
+        setTimeout(() => window.location.reload(), 1200);
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        showToast('Network error while running automation', false);
+    });
+}
 </script>

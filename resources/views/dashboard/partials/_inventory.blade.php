@@ -3,10 +3,12 @@
         <h1 class="page-title">Equipment Inventory</h1>
         <p class="page-subtitle">Manage stock levels, add new items, and track overall equipment inventory.</p>
     </div>
-    <a href="{{ url('/equipment/create') }}" class="btn btn-primary">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        Add Equipment
-    </a>
+    <div class="header-actions-mobile">
+        <a href="{{ url('/equipment/create') }}" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Add Equipment
+        </a>
+    </div>
 </div>
 <div class="card animate-fade-in-up" style="animation-delay: 100ms;">
     <div class="card-body">
@@ -24,7 +26,7 @@
             </div>
         </form>
         <div class="table-responsive">
-            <table class="data-table">
+            <table class="data-table mobile-cards">
                 <thead>
                     <tr><th>Name</th><th>Category</th><th>Total Qty</th><th>Available</th><th>Borrowed</th><th>Status</th><th>Actions</th></tr>
                 </thead>
@@ -32,19 +34,19 @@
                 @forelse($inventoryItems as $item)
                     @php $borrowed = $item->quantity - $item->available_quantity; @endphp
                     <tr>
-                        <td style="font-weight: 600;">{{ $item->name }}</td>
-                        <td><span class="badge badge-general">{{ $item->category }}</span></td>
-                        <td>{{ $item->quantity }}</td>
-                        <td>
+                        <td data-label="Name" style="font-weight: 600;">{{ $item->name }}</td>
+                        <td data-label="Category"><span class="badge badge-general">{{ $item->category }}</span></td>
+                        <td data-label="Total Qty">{{ $item->quantity }}</td>
+                        <td data-label="Available">
                             <span style="font-weight: 600; color: {{ $item->available_quantity > 0 ? '#10b981' : '#ef4444' }};">
                                 {{ $item->available_quantity }}
                             </span>
                         </td>
-                        <td>{{ $borrowed > 0 ? $borrowed : '—' }}</td>
-                        <td>
+                        <td data-label="Borrowed">{{ $borrowed > 0 ? $borrowed : '—' }}</td>
+                        <td data-label="Status">
                             <x-status-badge :status="$item->status" />
                         </td>
-                        <td>
+                        <td data-label="Actions">
                             <div class="btn-group">
                                 <a href="{{ url('/equipment/' . $item->id . '/edit') }}" class="btn btn-secondary btn-sm">Edit</a>
                                 <form method="POST" action="{{ url('/equipment/' . $item->id) }}" onsubmit="return confirm('Delete this equipment item?')">

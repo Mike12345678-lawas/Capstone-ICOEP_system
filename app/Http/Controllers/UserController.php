@@ -31,7 +31,13 @@ class UserController extends Controller
         }
 
         if ($statusFilter = $request->get('status')) {
-            $query->where('status', $statusFilter);
+            if ($statusFilter === 'inactive_auto') {
+                $query->where('status', 'inactive')->where('deactivation_reason', 'inactivity');
+            } elseif ($statusFilter === 'inactive_admin') {
+                $query->where('status', 'inactive')->where('deactivation_reason', 'admin');
+            } else {
+                $query->where('status', $statusFilter);
+            }
         }
 
         $users = $query->orderBy('last_name')->orderBy('first_name')
@@ -74,10 +80,19 @@ class UserController extends Controller
     {
         $validated = $request->validated();
 
-        $user = User::create(array_merge($validated, [
+        $additionalData = [
             'privacy_consent'      => true,
             'privacy_consent_date' => now(),
-        ]));
+        ];
+
+        if (($validated['status'] ?? 'active') === 'inactive') {
+            $additionalData['deactivated_at']      = now();
+            $additionalData['deactivation_reason'] = 'admin';
+        } else {
+            $additionalData['last_activity_at'] = now();
+        }
+
+        $user = User::create(array_merge($validated, $additionalData));
 
         AuditLog::log('CREATE_USER', 'users', $user->id);
 
@@ -125,15 +140,34 @@ class UserController extends Controller
             'phone'         => $validated['phone']         ?? null,
         ];
 
+        $reactivated = false;
+
         // Admin-only fields
         if (!$isSelf && Auth::user()->hasPermission('user.edit')) {
             $updateData['role_id'] = $validated['role_id'] ?? $user->role_id;
-            $updateData['status']  = $validated['status']  ?? $user->status;
 
-            // Unlock if setting to active from locked
-            if (($validated['status'] ?? '') === 'active' && $user->status === 'locked') {
-                $updateData['login_attempts'] = 0;
-                $updateData['locked_until']   = null;
+            if (isset($validated['status'])) {
+                $newStatus = $validated['status'];
+                $oldStatus = $user->status;
+                $updateData['status'] = $newStatus;
+
+                // Activation: set to active
+                if ($newStatus === 'active') {
+                    $updateData['login_attempts'] = 0;
+                    $updateData['locked_until']   = null;
+
+                    if ($oldStatus === 'inactive') {
+                        $updateData['last_activity_at']     = now();
+                        $updateData['deactivated_at']       = null;
+                        $updateData['deactivation_reason']  = null;
+                        $updateData['inactivity_warned_at'] = null;
+                        $reactivated = true;
+                    }
+                } elseif ($oldStatus !== 'inactive' && $newStatus === 'inactive') {
+                    // Manual admin deactivation
+                    $updateData['deactivated_at']       = now();
+                    $updateData['deactivation_reason']  = 'admin';
+                }
             }
         }
 
@@ -144,6 +178,10 @@ class UserController extends Controller
         $user->update($updateData);
         AuditLog::log('UPDATE_USER', 'users', $user->id);
 
+        if ($reactivated) {
+            AuditLog::log('REACTIVATED_USER', 'users', $user->id);
+        }
+
         return redirect('/users/' . $user->id . '/edit')->with('success', 'Profile updated successfully.');
     }
 
@@ -153,7 +191,11 @@ class UserController extends Controller
             return back()->with('error', 'You cannot delete your own account.');
         }
 
-        $user->update(['status' => 'inactive']);
+        $user->update([
+            'status'              => 'inactive',
+            'deactivated_at'      => now(),
+            'deactivation_reason' => 'admin',
+        ]);
         $user->delete(); // Soft delete
         AuditLog::log('DELETE_USER', 'users', $user->id);
 

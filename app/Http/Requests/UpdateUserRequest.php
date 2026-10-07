@@ -49,7 +49,7 @@ class UpdateUserRequest extends FormRequest
             'password'    => ['nullable', 'string', 'alpha_num', 'max:8', 'confirmed'],
             // Admin-only fields — validated but access is gated in the controller
             'role_id'     => ['nullable', 'integer', 'exists:roles,id'],
-            'status'      => ['nullable', 'in:active,inactive,locked'],
+            'status'      => ['nullable', 'in:active,inactive'],
         ];
     }
 

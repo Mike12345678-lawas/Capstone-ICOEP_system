@@ -3,10 +3,10 @@
 @php
 $s = strtolower(trim((string) $status));
 $badgeClass = match($s) {
-    'approved', 'returned', 'active', 'available', 'ongoing', 'stock ok', 'no conflict' => 'badge-success',
-    'rejected', 'cancelled', 'locked', 'retired', 'unavailable' => 'badge-error',
-    'borrowed', 'upcoming' => 'badge-general',
-    'pending', 'maintenance', 'completed' => 'badge-warning',
+    'approved', 'returned', 'active', 'available', 'ongoing', 'stock ok', 'no conflict', 'open' => 'badge-success',
+    'rejected', 'cancelled', 'locked', 'retired', 'unavailable', 'occupied' => 'badge-error',
+    'borrowed', 'upcoming', 'completed' => 'badge-general',
+    'pending', 'maintenance', 'expired' => 'badge-warning',
     default => 'badge-warning',
 };
 @endphp

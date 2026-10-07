@@ -20,4 +20,24 @@ class Equipment extends Model
     {
         return $query->where('status', 'available')->where('available_quantity', '>', 0);
     }
+
+    /**
+     * Compute available equipment quantity for a specific date range
+     * based on overlapping approved and borrowed requests.
+     */
+    public function availableStockForRange($startDate, $endDate, $excludeRequestId = null): int
+    {
+        $query = $this->requests()
+            ->whereIn('status', ['approved', 'borrowed'])
+            ->where('date_needed', '<=', $endDate)
+            ->where('expected_return_date', '>=', $startDate);
+
+        if ($excludeRequestId) {
+            $query->where('id', '!=', $excludeRequestId);
+        }
+
+        $overlappingDemand = (int) $query->sum('quantity');
+
+        return max(0, $this->quantity - $overlappingDemand);
+    }
 }

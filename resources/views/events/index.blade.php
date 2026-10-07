@@ -6,16 +6,18 @@
         <h1 class="page-title">Campus Events</h1>
         <p class="page-subtitle">Discover and register for upcoming campus events.</p>
     </div>
-    <div class="btn-group">
-        @if(auth()->user()->hasPermission('event.view'))
-            <a href="{{ url('/events/my') }}" class="btn btn-secondary">My Events</a>
-        @endif
-        @if(auth()->user()->hasPermission('event.create'))
-            <a href="{{ url('/events/create') }}" class="btn btn-primary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                Create Event
-            </a>
-        @endif
+    <div class="header-actions-mobile">
+        <div class="btn-row-mobile">
+            @if(auth()->user()->hasPermission('event.view'))
+                <a href="{{ url('/events/my') }}" class="btn btn-secondary">My Events</a>
+            @endif
+            @if(auth()->user()->hasPermission('event.create'))
+                <a href="{{ url('/events/create') }}" class="btn btn-primary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Create Event
+                </a>
+            @endif
+        </div>
     </div>
 </div>
 <div class="card animate-fade-in-up" style="animation-delay: 100ms;">

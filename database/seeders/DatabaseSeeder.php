@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,   // must run before UserSeeder (FK dependency)
             UserSeeder::class,
             FacilitySeeder::class,
+            FacilityReservationSeeder::class,
             EquipmentSeeder::class,
             EventSeeder::class,
             AnnouncementSeeder::class,
