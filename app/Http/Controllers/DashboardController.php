@@ -427,7 +427,11 @@ class DashboardController extends Controller
                 $q->where('first_name', 'like', "%{$data['search']}%")
                   ->orWhere('last_name', 'like', "%{$data['search']}%")
                   ->orWhere('email', 'like', "%{$data['search']}%")
-                  ->orWhere('employee_id', 'like', "%{$data['search']}%");
+                  ->orWhere('employee_id', 'like', "%{$data['search']}%")
+                  ->orWhereHas('department', function ($dq) use ($data) {
+                      $dq->where('name', 'like', "%{$data['search']}%")
+                         ->orWhere('code', 'like', "%{$data['search']}%");
+                  });
             });
         }
         if ($role) {

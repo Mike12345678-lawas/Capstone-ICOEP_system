@@ -22,7 +22,11 @@ class UserController extends Controller
                 $q->where('first_name', 'like', "%{$search}%")
                   ->orWhere('last_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('employee_id', 'like', "%{$search}%");
+                  ->orWhere('employee_id', 'like', "%{$search}%")
+                  ->orWhereHas('department', function ($dq) use ($search) {
+                      $dq->where('name', 'like', "%{$search}%")
+                         ->orWhere('code', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -62,7 +66,7 @@ class UserController extends Controller
     public function create()
     {
         $roles       = Role::orderBy('id')->get();
-        $departments = Department::orderBy('name')->get();
+        $departments = Department::orderBy('id')->get();
 
         return view('users.create', [
             'pageTitle' => 'Create User',
@@ -108,7 +112,7 @@ class UserController extends Controller
         }
 
         $roles       = Role::orderBy('id')->get();
-        $departments = Department::orderBy('name')->get();
+        $departments = Department::orderBy('id')->get();
 
         $breadcrumb = [['label' => 'Dashboard', 'url' => '/dashboard']];
         if (!$isSelf && Auth::user()->hasPermission('user.view')) {

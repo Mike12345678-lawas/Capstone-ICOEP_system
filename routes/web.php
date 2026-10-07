@@ -72,7 +72,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show'])->middleware('permission:announcement.view');
 
     // ─── User detail routes ───
-    Route::get('/users/create', [UserController::class, 'create'])->middleware('permission:user.create');
+    Route::get('/users/create', [UserController::class, 'create'])->name('users.create')->middleware('permission:user.create');
     Route::get('/users/{user}/edit', [UserController::class, 'edit']);
 
     // ─── Action routes (POST/PUT/PATCH/DELETE) ───

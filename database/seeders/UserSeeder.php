@@ -10,12 +10,9 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Resolve department IDs from the normalized departments table
-        $deptAdmin = Department::where('name', 'Administration')->first()?->id;
-        $deptGS    = Department::where('name', 'General Services')->first()?->id;
-        $deptCCS   = Department::where('name', 'College of Computer Studies')->first()?->id;
-        $deptBSIT  = Department::where('name', 'BSIT')->first()?->id;
-        $deptBSCS  = Department::where('name', 'BSCS')->first()?->id;
+        // Resolve department IDs from the canonical academic programs
+        $deptBSIT   = Department::where('code', 'BSIT')->first()?->id;
+        $deptBSBAFM = Department::where('code', 'BSBA-FM')->first()?->id;
 
         $users = [
             [
@@ -26,7 +23,7 @@ class UserSeeder extends Seeder
                 'email'         => 'admin@slmcb.edu.ph',
                 'password'      => 'Admin01a',
                 'role_id'       => 1,
-                'department_id' => $deptAdmin,
+                'department_id' => null,
                 'status'        => 'active',
                 'privacy_consent' => true,
                 'privacy_consent_date' => now(),
@@ -39,7 +36,7 @@ class UserSeeder extends Seeder
                 'email'         => 'maria.santos@slmcb.edu.ph',
                 'password'      => 'Admin01a',
                 'role_id'       => 2,
-                'department_id' => $deptGS,
+                'department_id' => null,
                 'status'        => 'active',
                 'privacy_consent' => true,
                 'privacy_consent_date' => now(),
@@ -52,7 +49,7 @@ class UserSeeder extends Seeder
                 'email'         => 'juan.delacruz@slmcb.edu.ph',
                 'password'      => 'Admin01a',
                 'role_id'       => 3,
-                'department_id' => $deptCCS,
+                'department_id' => $deptBSIT,
                 'status'        => 'active',
                 'privacy_consent' => true,
                 'privacy_consent_date' => now(),
@@ -78,7 +75,7 @@ class UserSeeder extends Seeder
                 'email'         => 'carlos.garcia@slmcb.edu.ph',
                 'password'      => 'Admin01a',
                 'role_id'       => 4,
-                'department_id' => $deptBSCS,
+                'department_id' => $deptBSBAFM,
                 'status'        => 'active',
                 'privacy_consent' => true,
                 'privacy_consent_date' => now(),
