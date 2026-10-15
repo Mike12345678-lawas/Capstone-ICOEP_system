@@ -16,18 +16,68 @@
     <div class="card-body">
         <form method="GET" action="{{ url('/dashboard') }}" class="search-bar" style="margin-bottom: 1rem;">
             <input type="hidden" name="section" value="users">
+            @if(!empty($roleFilter))
+                <input type="hidden" name="role" value="{{ $roleFilter }}">
+            @endif
+            @if(!empty($statusFilter))
+                <input type="hidden" name="status" value="{{ $statusFilter }}">
+            @endif
+
             <div class="search-input-wrapper">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 <input type="text" name="search" class="search-input" placeholder="Search users..." value="{{ $search }}">
             </div>
+
+            <div class="search-select-wrapper" style="flex: 0 1 260px; min-width: 200px; max-width: 100%;">
+                <select name="department" class="form-control form-select" onchange="this.form.submit()" style="height: 44px; font-size: .875rem;">
+                    <option value="">All Departments</option>
+                    @foreach($departments as $dept)
+                        @php
+                            $deptLabel = $dept->code && !str_starts_with($dept->name, $dept->code)
+                                ? "{$dept->code} – {$dept->name}"
+                                : $dept->name;
+                        @endphp
+                        <option value="{{ $dept->id }}" {{ (string)($departmentFilter ?? '') === (string)$dept->id ? 'selected' : '' }}>
+                            {{ $deptLabel }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
             <div class="filter-group">
-                <a href="{{ url('/dashboard?section=users') }}" class="filter-btn {{ empty($roleFilter) && empty($statusFilter) ? 'active' : '' }}">All</a>
+                @php
+                    $allQuery = array_merge(request()->query(), ['section' => 'users']);
+                    unset($allQuery['role'], $allQuery['status']);
+                    if (empty($allQuery['search'])) unset($allQuery['search']);
+                    if (empty($allQuery['department'])) unset($allQuery['department']);
+
+                    $hasActiveFilters = !empty($roleFilter) || !empty($statusFilter) || !empty($departmentFilter) || !empty($search);
+                @endphp
+                <a href="{{ url('/dashboard?' . http_build_query($allQuery)) }}" class="filter-btn {{ empty($roleFilter) && empty($statusFilter) && empty($departmentFilter) ? 'active' : '' }}">All</a>
                 @foreach($roles as $r)
-                    <a href="{{ url('/dashboard?section=users&role=' . $r->id) }}" class="filter-btn {{ ($roleFilter ?? '') == $r->id ? 'active' : '' }}">{{ $r->name }}</a>
+                    @php
+                        $roleQuery = array_merge(request()->query(), ['section' => 'users', 'role' => $r->id]);
+                        unset($roleQuery['status']);
+                        if (empty($roleQuery['search'])) unset($roleQuery['search']);
+                        if (empty($roleQuery['department'])) unset($roleQuery['department']);
+                    @endphp
+                    <a href="{{ url('/dashboard?' . http_build_query($roleQuery)) }}" class="filter-btn {{ ($roleFilter ?? '') == $r->id ? 'active' : '' }}">{{ $r->name }}</a>
                 @endforeach
-                <a href="{{ url('/dashboard?section=users&status=inactive_auto') }}" class="filter-btn {{ ($statusFilter ?? '') === 'inactive_auto' ? 'active' : '' }}" title="Accounts auto-deactivated due to inactivity">
+                @php
+                    $statusQuery = array_merge(request()->query(), ['section' => 'users', 'status' => 'inactive_auto']);
+                    unset($statusQuery['role']);
+                    if (empty($statusQuery['search'])) unset($statusQuery['search']);
+                    if (empty($statusQuery['department'])) unset($statusQuery['department']);
+                @endphp
+                <a href="{{ url('/dashboard?' . http_build_query($statusQuery)) }}" class="filter-btn {{ ($statusFilter ?? '') === 'inactive_auto' ? 'active' : '' }}" title="Accounts auto-deactivated due to inactivity">
                     ⚡ Auto-Deactivated
                 </a>
+
+                @if($hasActiveFilters)
+                    <a href="{{ url('/dashboard?section=users') }}" class="clear-filters-link" style="font-size: .8125rem; color: var(--color-text-muted, #94a3b8); text-decoration: underline; align-self: center; margin-left: .25rem; white-space: nowrap;">
+                        Clear filters
+                    </a>
+                @endif
             </div>
         </form>
         <div class="table-responsive">
@@ -82,7 +132,7 @@
                     <tr>
                         <td colspan="8" class="text-center text-muted" style="padding: 2rem 1rem;">
                             <p style="margin-bottom: .5rem;">No users found.</p>
-                            @if(request('search') || request('role') || request('status'))
+                            @if(request('search') || request('role') || request('status') || request('department'))
                                 <a href="{{ url('/dashboard?section=users') }}" class="btn btn-secondary btn-sm">Clear Filters</a>
                             @else
                                 <a href="{{ url('/users/create') }}" class="btn btn-primary btn-sm">Create User</a>

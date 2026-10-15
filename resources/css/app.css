@@ -1682,8 +1682,20 @@ html.dark {
     }
 
     /* ═══════════ TABLES ═══════════ */
-    .table-responsive {
+    .table-responsive,
+    .table-scroll-wrapper,
+    .table-responsive-scroll,
+    .table-scroll {
+        width: 100%;
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+    }
+
+    .table-scroll-wrapper table,
+    .table-responsive-scroll table,
+    .table-scrollable {
+        min-width: 620px;
     }
 
     .table {
@@ -2035,9 +2047,26 @@ html.dark {
 /* ═══════════ MOBILE STACKED CARDS (<768px) ═══════════ */
 @media (max-width: 767.98px) {
 
-    .manage-table-responsive,
-    .table-responsive {
+    /* Only allow visible overflow when the child table actually uses the mobile-cards stacked layout */
+    .manage-table-responsive:has(.mobile-cards:not(.force-table-view)),
+    .manage-table-responsive:has(.responsive-card-table:not(.force-table-view)),
+    .table-responsive:has(.mobile-cards:not(.force-table-view)),
+    .table-responsive:has(.responsive-card-table:not(.force-table-view)) {
         overflow-x: visible;
+    }
+
+    /* Standard tables and scroll wrappers MUST scroll horizontally on mobile without clipping */
+    .table-responsive:not(:has(.mobile-cards)):not(:has(.responsive-card-table)),
+    .table-scroll-wrapper,
+    .table-responsive-scroll,
+    .table-scroll,
+    .table-responsive:has(.force-table-view) {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-x: contain;
+        width: 100%;
+        max-width: 100%;
+        display: block;
     }
 
     .responsive-card-table thead,
@@ -2057,6 +2086,7 @@ html.dark {
     .data-table.mobile-cards tr {
         display: block;
         width: 100%;
+        min-width: 0 !important;
     }
 
     .responsive-card-table tr,
@@ -2893,4 +2923,479 @@ html.dark {
         justify-content: center;
         font-size: 0.9375rem;
     }
+}
+
+/* ═══════════ EVENT PARTICIPANT MANAGEMENT & ATTENDANCE ═══════════ */
+.participant-management-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid var(--color-surface-200);
+}
+
+.participant-search-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 380px;
+}
+
+@media (max-width: 639.98px) {
+    .participant-search-wrapper {
+        max-width: 100%;
+        min-width: 100%;
+    }
+    .participant-management-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.participant-search-wrapper svg {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-surface-400);
+    pointer-events: none;
+}
+
+.participant-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    border-radius: 0.5rem;
+    border: 1.5px solid var(--color-surface-200);
+    background: var(--bg-card);
+    font-size: 0.875rem;
+    color: var(--color-surface-900);
+    outline: none;
+    transition: all 0.2s;
+}
+
+.participant-search-input:focus {
+    border-color: var(--color-brand-400);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.participant-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 639.98px) {
+    .participant-toolbar-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+    .participant-toolbar-actions .btn {
+        width: 100%;
+        justify-content: center;
+        font-size: 0.8125rem;
+        padding: 0.4rem 0.5rem;
+    }
+}
+
+/* Stats Pill Bar */
+.participant-stats-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.625rem 0.875rem;
+    background: var(--color-surface-50);
+    border: 1px solid var(--color-surface-200);
+    border-radius: 0.75rem;
+    font-size: 0.8125rem;
+}
+
+.stat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.625rem;
+    border-radius: 9999px;
+    font-weight: 600;
+}
+
+.stat-pill-total {
+    background: var(--color-surface-200);
+    color: var(--color-surface-700);
+}
+
+.stat-pill-attended {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.stat-pill-absent {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* View Mode Switcher */
+.view-mode-toggle {
+    display: inline-flex;
+    background: var(--color-surface-100);
+    border-radius: 0.5rem;
+    padding: 2px;
+    border: 1px solid var(--color-surface-200);
+}
+
+.view-mode-btn {
+    border: none;
+    background: transparent;
+    padding: 0.3rem 0.65rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-surface-600);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.view-mode-btn.active {
+    background: var(--bg-card);
+    color: var(--color-brand-600);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* User Info Cell */
+.participant-user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.user-avatar-initials {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-brand-500, #0ea5e9), var(--color-brand-700, #0369a1));
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.participant-name {
+    font-weight: 600;
+    color: var(--color-surface-900);
+    font-size: 0.9375rem;
+    line-height: 1.25;
+}
+
+.participant-role {
+    font-size: 0.75rem;
+    margin-top: 0.125rem;
+}
+
+.email-text {
+    word-break: break-all;
+    color: var(--color-surface-600);
+    font-size: 0.875rem;
+}
+
+/* Attendance Toggle Controls */
+.attendance-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    margin: 0;
+}
+
+.attendance-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.attendance-badge-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border: 1.5px solid transparent;
+    transition: all 0.15s ease-in-out;
+    min-height: 34px;
+}
+
+.attendance-badge-state.is-attended {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #15803d;
+}
+
+.attendance-badge-state.is-absent {
+    background: var(--color-surface-100);
+    border-color: var(--color-surface-300);
+    color: var(--color-surface-600);
+}
+
+.attendance-badge-state:hover {
+    filter: brightness(0.97);
+}
+
+.attendance-status-icon {
+    font-weight: 800;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+/* Status Control Card inside Event Manage */
+.status-control-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+@media (max-width: 639.98px) {
+    .status-control-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .status-control-group select,
+    .status-control-group button {
+        width: 100% !important;
+    }
+}
+
+/* Swipe horizontal hint banner on small touchscreens */
+.table-scroll-hint {
+    display: none;
+    padding: 0.5rem 0.85rem;
+    background: rgba(14, 165, 233, 0.08);
+    border: 1px dashed rgba(14, 165, 233, 0.4);
+    border-radius: 0.625rem;
+    color: var(--color-brand-700);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    margin-bottom: 0.875rem;
+    align-items: center;
+    gap: 0.5rem;
+    animation: pulseHint 2s infinite ease-in-out;
+}
+
+@keyframes pulseHint {
+    0%, 100% { opacity: 0.95; }
+    50% { opacity: 0.7; }
+}
+
+.table-scroll-hint.show {
+    display: flex !important;
+}
+
+/* Participant table scroll container */
+.participant-table-scroll {
+    position: relative;
+    width: 100%;
+}
+
+.participant-table-scroll.is-cards-view {
+    overflow-x: visible !important;
+}
+
+.participant-table-scroll.is-table-view {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-x: contain;
+}
+
+/* Table default header and cells */
+.participant-table th {
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-surface-500);
+    font-weight: 600;
+}
+
+.participant-table td {
+    padding: 0.875rem 1rem;
+    vertical-align: middle;
+}
+
+/* Mobile cards custom cell overrides for participants */
+@media (max-width: 767.98px) {
+    .participant-table.mobile-cards td[data-label="Participant"] {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding-bottom: 0.75rem;
+        border-bottom: 1.5px solid var(--color-surface-100);
+    }
+    .participant-table.mobile-cards td[data-label="Participant"]::before {
+        display: none;
+    }
+    .participant-table.mobile-cards td[data-label="Participant"] .participant-user-info {
+        text-align: left;
+        width: 100%;
+    }
+    .participant-table.mobile-cards td[data-label="Attendance"] {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 0.75rem;
+        border-bottom: none;
+    }
+    .participant-table.mobile-cards td[data-label="Attendance"]::before {
+        font-size: 0.8125rem;
+    }
+    .participant-table.mobile-cards td[data-label="Attendance"] .attendance-toggle-label {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .participant-table.mobile-cards td[data-label="Attendance"] .attendance-badge-state {
+        min-height: 42px;
+        padding: 0.5rem 1.125rem;
+        font-size: 0.875rem;
+    }
+}
+
+/* Force Table View (when user explicitly toggles table mode on mobile) */
+.participant-table.force-table-view,
+.participant-table.force-table-view tbody,
+.participant-table.force-table-view tr {
+    display: table !important;
+    width: 100% !important;
+    min-width: 620px !important;
+}
+.participant-table.force-table-view thead {
+    display: table-header-group !important;
+}
+.participant-table.force-table-view tr {
+    display: table-row !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.participant-table.force-table-view td {
+    display: table-cell !important;
+    text-align: left !important;
+    padding: 0.75rem 1rem !important;
+    border-bottom: 1px solid var(--color-surface-100) !important;
+}
+.participant-table.force-table-view td::before {
+    display: none !important;
+}
+.participant-table.force-table-view td[data-label="Attendance"] {
+    text-align: center !important;
+}
+.participant-table.force-table-view td[data-label="Attendance"] .attendance-toggle-label {
+    justify-content: center !important;
+}
+
+/* Tablet force-cards-view (optional card grid on tablets) */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .participant-table.force-cards-view {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+        gap: 1rem !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+    .participant-table.force-cards-view thead {
+        display: none !important;
+    }
+    .participant-table.force-cards-view tbody {
+        display: contents !important;
+    }
+    .participant-table.force-cards-view tr {
+        display: flex !important;
+        flex-direction: column !important;
+        background: var(--bg-card, #ffffff) !important;
+        border: 1px solid var(--color-surface-200, #e2e8f0) !important;
+        border-radius: 0.875rem !important;
+        padding: 1rem !important;
+        margin: 0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    }
+    .participant-table.force-cards-view td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 0.5rem 0 !important;
+        border: none !important;
+        border-bottom: 1px solid var(--color-surface-100, #f1f5f9) !important;
+    }
+    .participant-table.force-cards-view td:last-child {
+        border-bottom: none !important;
+    }
+    .participant-table.force-cards-view td::before {
+        content: attr(data-label) !important;
+        font-weight: 600 !important;
+        font-size: 0.75rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.04em !important;
+        color: var(--color-surface-500, #64748b) !important;
+    }
+    .participant-table.force-cards-view td[data-label="Participant"]::before {
+        display: none !important;
+    }
+    .participant-table.force-cards-view td[data-label="Attendance"] .attendance-toggle-label {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+/* Submit Bar */
+.participant-submit-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-surface-200);
+    flex-wrap: wrap;
+}
+
+@media (max-width: 639.98px) {
+    .participant-submit-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .participant-submit-bar .btn {
+        width: 100%;
+        min-height: 44px;
+        font-size: 0.9375rem;
+        justify-content: center;
+    }
+}
+
+/* Empty Search Results */
+.participant-empty-search {
+    display: none;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--color-surface-500);
+    font-size: 0.9375rem;
 }

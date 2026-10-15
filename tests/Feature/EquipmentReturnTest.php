@@ -698,4 +698,72 @@ class EquipmentReturnTest extends TestCase
         $resSearchEq = $this->get('/dashboard?section=borrowed-equipment&search=Thesis+Shoot');
         $resSearchEq->assertDontSee('Borrower Personal Thesis Shoot');
     }
+
+    /**
+     * 16. Approved equipment request increments active borrows counter and appears on returns desk
+     */
+    public function test_approved_equipment_request_increments_active_borrows_counter_and_appears_on_returns_desk(): void
+    {
+        EquipmentRequest::create([
+            'equipment_id'         => $this->equipment->id,
+            'user_id'              => $this->borrower->id,
+            'quantity'             => 1,
+            'purpose'              => 'Live streaming session',
+            'date_needed'          => now()->addDays(1),
+            'expected_return_date' => now()->addDays(4),
+            'status'               => 'approved',
+        ]);
+
+        $this->actingAs($this->admin);
+
+        // Standalone route
+        $resDesk = $this->get('/equipment/returns');
+        $resDesk->assertOk();
+        $resDesk->assertSee('Active Borrows');
+        $resDesk->assertSee('Sony 4K Camera');
+        $resDesk->assertSee('Process Return');
+        $resDesk->assertViewHas('counters', function ($counters) {
+            return ($counters['active_borrows'] ?? 0) === 1;
+        });
+
+        // Unified dashboard section
+        $resSection = $this->get('/dashboard?section=equipment-returns');
+        $resSection->assertOk();
+        $resSection->assertSee('Equipment Returns Desk');
+        $resSection->assertSee('Sony 4K Camera');
+        $resSection->assertSee('Process Return');
+    }
+
+    /**
+     * 17. Sidebar highlights Equipment Returns and does not highlight Dashboard when viewing returns desk
+     */
+    public function test_sidebar_highlights_equipment_returns_and_not_dashboard_when_on_returns(): void
+    {
+        $this->actingAs($this->admin);
+
+        // Standalone returns page
+        $response = $this->get('/equipment/returns');
+        $response->assertOk();
+
+        $content = $response->getContent();
+
+        // Ensure Dashboard link does not have active class
+        $this->assertMatchesRegularExpression(
+            '#<a\s+href="[^"]*\/dashboard"\s+class="nav-link\s*(?!active)"#i',
+            $content,
+            'Dashboard link must not be active on equipment returns page.'
+        );
+
+        // Unified dashboard returns section
+        $resSection = $this->get('/dashboard?section=equipment-returns');
+        $resSection->assertOk();
+        $sectionContent = $resSection->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '#<a\s+href="[^"]*\/dashboard"\s+class="nav-link\s*(?!active)"#i',
+            $sectionContent,
+            'Dashboard link must not be active on dashboard?section=equipment-returns.'
+        );
+    }
 }
+

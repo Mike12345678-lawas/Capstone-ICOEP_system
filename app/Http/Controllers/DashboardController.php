@@ -46,7 +46,8 @@ class DashboardController extends Controller
             'users'            => $this->loadUsers($data, $request, $user),
             'inventory'        => $this->loadInventory($data, $request, $user),
             'manage-bookings'  => $this->loadManageBookings($data, $request),
-            'manage-equipment' => $this->loadManageEquipment($data, $request),
+            'manage-equipment'  => $this->loadManageEquipment($data, $request),
+            'equipment-returns' => $this->loadEquipmentReturns($data, $request),
             'reports'          => $this->loadReports($data, $request),
             'calendar'         => null, // Calendar loads data via API
             default            => $this->loadOverview($data, $user),
@@ -419,8 +420,9 @@ class DashboardController extends Controller
         }
 
         $query = User::with(['role', 'department'])->whereNull('deleted_at');
-        $role   = $request->get('role', '');
-        $status = $request->get('status', '');
+        $role       = $request->get('role', '');
+        $status     = $request->get('status', '');
+        $department = $request->get('department', '');
 
         if ($data['search']) {
             $query->where(function ($q) use ($data) {
@@ -437,6 +439,9 @@ class DashboardController extends Controller
         if ($role) {
             $query->where('role_id', $role);
         }
+        if ($department) {
+            $query->where('department_id', $department);
+        }
         if ($status === 'inactive_auto') {
             $query->where('status', 'inactive')->where('deactivation_reason', 'inactivity');
         } elseif ($status === 'inactive_admin') {
@@ -445,10 +450,12 @@ class DashboardController extends Controller
             $query->where('status', $status);
         }
 
-        $data['users']        = $query->latest()->paginate(15);
-        $data['roles']        = Role::all();
-        $data['roleFilter']   = $role;
-        $data['statusFilter'] = $status;
+        $data['users']            = $query->latest()->paginate(15)->withQueryString();
+        $data['roles']            = Role::all();
+        $data['roleFilter']       = $role;
+        $data['statusFilter']     = $status;
+        $data['departments']      = Department::orderBy('name')->get();
+        $data['departmentFilter'] = $department;
     }
 
     // ─── INVENTORY (Admin CRUD) ──────────────────────────────────────────
@@ -580,6 +587,27 @@ class DashboardController extends Controller
             $stockMap[$req->id] = $shortfall > 0 ? "Short by {$shortfall}" : 'Stock OK';
         }
         $data['stockMap'] = $stockMap;
+    }
+
+    // ─── EQUIPMENT RETURNS (Admin/Staff) ─────────────────────────────────
+
+    protected function loadEquipmentReturns(array &$data, Request $request): void
+    {
+        $user = Auth::user();
+        if (!$user->hasPermission('equipment.approve')) {
+            abort(403);
+        }
+
+        $deskData = EquipmentReturnController::getDeskData($request);
+        foreach ($deskData as $key => $val) {
+            $data[$key] = $val;
+        }
+
+        $data['pageTitle'] = 'Equipment Returns Desk';
+        $data['breadcrumb'] = [
+            ['label' => 'Dashboard', 'url' => '/dashboard'],
+            ['label' => 'Equipment Returns'],
+        ];
     }
 
     // ─── REPORTS (Admin) ─────────────────────────────────────────────────

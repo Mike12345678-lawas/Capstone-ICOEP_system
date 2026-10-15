@@ -39,6 +39,9 @@
     @case('manage-equipment')
         @include('dashboard.partials._manage_equipment')
         @break
+    @case('equipment-returns')
+        @include('dashboard.partials._equipment_returns')
+        @break
     @case('reports')
         @include('dashboard.partials._reports')
         @break

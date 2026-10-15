@@ -1,5 +1,7 @@
 @php
-    $currentSection = request()->get('section', 'overview');
+    $currentSection = request()->is('dashboard')
+        ? request()->get('section', 'overview')
+        : (request()->is('equipment/returns*') ? 'equipment-returns' : '');
     $roleName = auth()->user()->role->name ?? '';
 @endphp
 <aside class="sidebar" id="sidebar">
@@ -24,7 +26,7 @@
                 <span>Main</span>
             </div>
             <div class="nav-section-content">
-                <a href="{{ url('/dashboard') }}" class="nav-link {{ $currentSection === 'overview' ? 'active' : '' }}">
+                <a href="{{ url('/dashboard') }}" class="nav-link {{ (request()->is('dashboard') && in_array(request()->get('section', 'overview'), ['overview', ''])) ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="7" height="7"></rect>
                         <rect x="14" y="3" width="7" height="7"></rect>
@@ -155,7 +157,7 @@
                     <span>Equipment Requests</span>
                 </a>
 
-                <a href="{{ url('/equipment/returns') }}" class="nav-link {{ request()->is('equipment/returns*') ? 'active' : '' }}">
+                <a href="{{ url('/dashboard?section=equipment-returns') }}" class="nav-link {{ ($currentSection === 'equipment-returns' || request()->is('equipment/returns*')) ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="1 4 1 10 7 10"></polyline>
                         <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>

@@ -28,7 +28,7 @@
         <p class="page-subtitle">Review and approve or reject equipment borrowing requests.</p>
     </div>
     <div>
-        <a href="{{ url('/equipment/returns') }}" class="btn btn-primary btn-sm">
+        <a href="{{ url('/dashboard?section=equipment-returns') }}" class="btn btn-primary btn-sm">
             📦 Equipment Returns Desk
         </a>
     </div>
@@ -98,11 +98,16 @@
                                         onclick="openEqRejectModal({{ $req->id }}, this)">Reject</button>
                                 </div>
                             @elseif(auth()->user()->hasPermission('equipment.approve') && $req->status === 'approved')
-                                <form method="POST" action="{{ url('/equipment-requests/' . $req->id . '/status') }}" style="margin:0;">
-                                    @csrf @method('PATCH')
-                                    <input type="hidden" name="status" value="borrowed">
-                                    <button type="submit" class="btn btn-primary btn-sm" style="font-size: 0.75rem;">Release (Mark Borrowed)</button>
-                                </form>
+                                <div class="btn-group" style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                                    <form method="POST" action="{{ url('/equipment-requests/' . $req->id . '/status') }}" style="margin:0;">
+                                        @csrf @method('PATCH')
+                                        <input type="hidden" name="status" value="borrowed">
+                                        <button type="submit" class="btn btn-primary btn-sm" style="font-size: 0.75rem;">Release (Mark Borrowed)</button>
+                                    </form>
+                                    <a href="{{ url('/dashboard?section=equipment-returns&request_id=' . $req->id) }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">Return Desk</a>
+                                </div>
+                            @elseif(auth()->user()->hasPermission('equipment.approve') && $req->status === 'borrowed')
+                                <a href="{{ url('/dashboard?section=equipment-returns&request_id=' . $req->id) }}" class="btn btn-primary btn-sm" style="font-size: 0.75rem;">Process Return</a>
                             @else
                                 <span class="text-muted">—</span>
                             @endif

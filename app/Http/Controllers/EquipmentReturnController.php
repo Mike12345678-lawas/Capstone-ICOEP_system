@@ -126,9 +126,28 @@ class EquipmentReturnController extends Controller
      */
     public function index(Request $request)
     {
+        $deskData = self::getDeskData($request);
+
+        return view('equipment.returns', array_merge([
+            'pageTitle'  => 'Equipment Returns Desk',
+            'breadcrumb' => [
+                ['label' => 'Dashboard', 'url' => '/dashboard'],
+                ['label' => 'Equipment Returns'],
+            ],
+        ], $deskData));
+    }
+
+    /**
+     * Shared data provider for the Equipment Returns Desk
+     * (used by both /equipment/returns and /dashboard?section=equipment-returns).
+     */
+    public static function getDeskData(Request $request): array
+    {
         $today = now()->startOfDay();
 
         // 1. Top Counters
+        $activeBorrowsCount = EquipmentRequest::whereIn('status', ['borrowed', 'approved'])->count();
+
         $returningTodayCount = EquipmentRequest::whereIn('status', ['borrowed', 'approved'])
             ->whereDate('expected_return_date', $today->toDateString())
             ->count();
@@ -141,6 +160,16 @@ class EquipmentReturnController extends Controller
             ->whereNotNull('return_requested_at')
             ->count();
 
+        $returnedTotalCount = EquipmentRequest::where('status', 'returned')->count();
+
+        $counters = [
+            'active_borrows'  => $activeBorrowsCount,
+            'returning_today' => $returningTodayCount,
+            'overdue'         => $overdueCount,
+            'needs_check'     => $needsCheckCount,
+            'returned_total'  => $returnedTotalCount,
+        ];
+
         // 2. Search / Lookup
         $search = trim($request->get('search', ''));
         $selectedRequestId = $request->get('request_id');
@@ -148,13 +177,12 @@ class EquipmentReturnController extends Controller
         $selectedRequest = null;
 
         if ($selectedRequestId) {
-            $selectedRequest = EquipmentRequest::with(['user.role', 'equipment', 'approver'])
-                ->whereIn('status', ['borrowed', 'approved'])
+            $selectedRequest = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'approver', 'confirmedBy'])
                 ->find($selectedRequestId);
         }
 
         if ($search !== '') {
-            $query = EquipmentRequest::with(['user.role', 'equipment', 'approver'])
+            $query = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'approver'])
                 ->whereIn('status', ['borrowed', 'approved']);
 
             $cleanSearch = ltrim(strtoupper($search), 'REQ-');
@@ -169,7 +197,8 @@ class EquipmentReturnController extends Controller
                        ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', "%{$search}%")
                        ->orWhere('email', 'like', "%{$search}%");
                 })->orWhereHas('equipment', function ($eq) use ($search) {
-                    $eq->where('name', 'like', "%{$search}%");
+                    $eq->where('name', 'like', "%{$search}%")
+                       ->orWhere('category', 'like', "%{$search}%");
                 });
             });
 
@@ -181,37 +210,50 @@ class EquipmentReturnController extends Controller
             }
         }
 
-        // 3. Overdue List
-        $overdueRequests = EquipmentRequest::with(['user.role', 'equipment'])
+        // 3. Lists for desk tabs
+        $activeRequests = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'approver'])
+            ->whereIn('status', ['borrowed', 'approved'])
+            ->orderBy('expected_return_date')
+            ->get();
+
+        $overdueRequests = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'approver'])
             ->whereIn('status', ['borrowed', 'approved'])
             ->where('expected_return_date', '<', $today)
             ->orderBy('expected_return_date')
             ->get();
 
-        // 4. Needs Check List (borrower requested return)
-        $needsCheckRequests = EquipmentRequest::with(['user.role', 'equipment'])
+        $needsCheckRequests = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'approver'])
             ->whereIn('status', ['borrowed', 'approved'])
             ->whereNotNull('return_requested_at')
             ->orderBy('return_requested_at')
             ->get();
 
-        return view('equipment.returns', [
-            'pageTitle'           => 'Equipment Returns Desk',
-            'breadcrumb'          => [
-                ['label' => 'Dashboard', 'url' => '/dashboard'],
-                ['label' => 'Equipment Returns'],
-            ],
-            'counters'            => [
-                'returning_today' => $returningTodayCount,
-                'overdue'         => $overdueCount,
-                'needs_check'     => $needsCheckCount,
-            ],
-            'search'              => $search,
-            'matchingRequests'    => $matchingRequests,
-            'selectedRequest'     => $selectedRequest,
-            'overdueRequests'     => $overdueRequests,
-            'needsCheckRequests'  => $needsCheckRequests,
-        ]);
+        $returningTodayRequests = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'approver'])
+            ->whereIn('status', ['borrowed', 'approved'])
+            ->whereDate('expected_return_date', $today->toDateString())
+            ->orderBy('expected_return_date')
+            ->get();
+
+        $recentReturnedRequests = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'confirmedBy'])
+            ->where('status', 'returned')
+            ->orderByDesc('returned_at')
+            ->limit(15)
+            ->get();
+
+        $currentTab = $request->get('tab', 'active');
+
+        return [
+            'counters'               => $counters,
+            'search'                 => $search,
+            'matchingRequests'       => $matchingRequests,
+            'selectedRequest'        => $selectedRequest,
+            'activeRequests'         => $activeRequests,
+            'overdueRequests'        => $overdueRequests,
+            'needsCheckRequests'     => $needsCheckRequests,
+            'returningTodayRequests' => $returningTodayRequests,
+            'recentReturnedRequests' => $recentReturnedRequests,
+            'currentTab'             => $currentTab,
+        ];
     }
 
     /**
@@ -326,7 +368,11 @@ class EquipmentReturnController extends Controller
             if ($request->expectsJson()) {
                 return response()->json(['success' => true, 'message' => $msg]);
             }
-            return redirect('/equipment/returns')->with('info', $msg);
+            $referer = (string) $request->header('referer', '');
+            $redirectTarget = str_contains($referer, 'section=equipment-returns')
+                ? '/dashboard?section=equipment-returns'
+                : '/equipment/returns';
+            return redirect($redirectTarget)->with('info', $msg);
         }
 
         if ($txError) {
@@ -384,7 +430,13 @@ class EquipmentReturnController extends Controller
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => $successMsg]);
         }
-        return redirect('/equipment/returns')->with('success', $successMsg);
+
+        $referer = (string) $request->header('referer', '');
+        $redirectTarget = str_contains($referer, 'section=equipment-returns')
+            ? '/dashboard?section=equipment-returns'
+            : '/equipment/returns';
+
+        return redirect($redirectTarget)->with('success', $successMsg);
     }
 
     /**

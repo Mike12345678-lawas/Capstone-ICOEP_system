@@ -189,7 +189,7 @@ class EventController extends Controller
 
     public function manage(Event $event, Request $request)
     {
-        $event->load(['registrations.user']);
+        $event->load(['registrations.user.role', 'registrations.user.department']);
 
         return view('events.manage', [
             'pageTitle' => 'Manage: ' . $event->title,
@@ -220,16 +220,18 @@ class EventController extends Controller
     public function markAttendance(Request $request, Event $event)
     {
         $request->validate([
-            'user_ids'   => 'required|array',
+            'user_ids'   => 'nullable|array',
             'user_ids.*' => 'integer|exists:event_registrations,user_id',
         ]);
 
+        $userIds = $request->input('user_ids', []);
+
         EventRegistration::where('event_id', $event->id)
-            ->whereIn('user_id', $request->user_ids)
+            ->whereIn('user_id', $userIds)
             ->update(['has_attended' => true, 'checked_in_at' => now()]);
 
         EventRegistration::where('event_id', $event->id)
-            ->whereNotIn('user_id', $request->user_ids)
+            ->whereNotIn('user_id', $userIds)
             ->update(['has_attended' => false, 'checked_in_at' => null]);
 
         AuditLog::log('MARK_ATTENDANCE', 'events', $event->id);
