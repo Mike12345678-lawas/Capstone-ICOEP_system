@@ -1,6 +1,0 @@
-.env
-node_modules
-vendor
-storage/logs
-tests
-.git
