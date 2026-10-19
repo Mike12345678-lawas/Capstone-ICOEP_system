@@ -20,7 +20,7 @@ class EventNotificationService
     public static function notifyAudience(Event $event, ?int $senderId = null): int
     {
         $senderId = $senderId ?? $event->organizer_id ?? Auth::id();
-        $audience = $event->target_audience ?: Event::AUDIENCE_ALL;
+        $audiences = $event->getTargetAudiences();
 
         // Query active users
         $query = User::active();
@@ -28,44 +28,29 @@ class EventNotificationService
             $query->where('id', '!=', $senderId);
         }
 
-        // Filter users based on audience
-        switch ($audience) {
-            case Event::AUDIENCE_FACULTY:
-                $query->whereHas('role', fn($q) => $q->where('name', 'Faculty'));
-                $title = "🎓 New Faculty Event: {$event->title}";
-                $prefix = "A new event for Faculty only";
-                break;
+        if (in_array(Event::AUDIENCE_ALL, $audiences, true)) {
+            // Campus-wide event
+            $title = "📅 New Campus Event: {$event->title}";
+            $prefix = "A new campus-wide event";
+        } else {
+            $query->where(function ($q) use ($audiences) {
+                foreach ($audiences as $audience) {
+                    if ($audience === Event::AUDIENCE_FACULTY) {
+                        $q->orWhereHas('role', fn($rq) => $rq->where('name', 'Faculty'));
+                    } elseif ($audience === Event::AUDIENCE_STAFF) {
+                        $q->orWhereHas('role', fn($rq) => $rq->whereIn('name', Event::STAFF_ROLES));
+                    } elseif ($audience === Event::AUDIENCE_STUDENT) {
+                        $q->orWhereHas('role', fn($rq) => $rq->where('name', 'Student'));
+                    } elseif (array_key_exists($audience, Event::DEPARTMENT_AUDIENCES)) {
+                        $deptCode = Event::DEPARTMENT_AUDIENCES[$audience];
+                        $q->orWhereHas('department', fn($dq) => $dq->where('code', $deptCode));
+                    }
+                }
+            });
 
-            case Event::AUDIENCE_STAFF:
-                $query->whereHas('role', fn($q) => $q->whereIn('name', Event::STAFF_ROLES));
-                $title = "📋 New Staff Event: {$event->title}";
-                $prefix = "A new event for Staff (Non-teaching) only";
-                break;
-
-            case Event::AUDIENCE_STUDENT:
-                $query->whereHas('role', fn($q) => $q->where('name', 'Student'));
-                $title = "🎒 New Student Event: {$event->title}";
-                $prefix = "A new event for Students only";
-                break;
-
-            case Event::AUDIENCE_BSIT:
-            case Event::AUDIENCE_BSHM:
-            case Event::AUDIENCE_BSBA_FM:
-            case Event::AUDIENCE_BSED:
-            case Event::AUDIENCE_BEED:
-                $deptCode = Event::DEPARTMENT_AUDIENCES[$audience];
-                $query->whereHas('department', fn($q) => $q->where('code', $deptCode));
-                $deptLabel = Event::AUDIENCES[$audience] ?? strtoupper($deptCode);
-                $title = "📣 New {$deptLabel} Event: {$event->title}";
-                $prefix = "A new event for {$deptLabel}";
-                break;
-
-            case Event::AUDIENCE_ALL:
-            default:
-                // All active users
-                $title = "📅 New Campus Event: {$event->title}";
-                $prefix = "A new campus-wide event";
-                break;
+            $label = $event->target_audience_label;
+            $title = "📣 New Event ({$label}): {$event->title}";
+            $prefix = "A new event for {$label}";
         }
 
         $recipients = $query->get();

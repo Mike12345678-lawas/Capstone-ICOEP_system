@@ -495,4 +495,177 @@ class EventTargetAudienceTest extends TestCase
             ->assertSessionHas('error');
         $this->assertFalse(EventRegistration::where('event_id', $bsitEvent->id)->where('user_id', $bshmStudent->id)->exists());
     }
+
+    public function test_multiple_target_audiences_creation_and_notifications(): void
+    {
+        $bsitDept = Department::where('code', 'BSIT')->first();
+        $bshmDept = Department::where('code', 'BSHM')->first();
+        $bsbaDept = Department::where('code', 'BSBA-FM')->first();
+
+        $bsitStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bsitDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'IT-MULTI-1',
+            'email'         => 'itmulti1@icoep.test',
+        ]);
+
+        $bshmStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bshmDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'HM-MULTI-1',
+            'email'         => 'hmmulti1@icoep.test',
+        ]);
+
+        $bsbaStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bsbaDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'BA-MULTI-1',
+            'email'         => 'bamulti1@icoep.test',
+        ]);
+
+        $response = $this->actingAs($this->admin)->post('/events', [
+            'title'            => 'Joint IT and Hospitality Summit',
+            'objectives'       => 'Exploring digital systems and automation across the hospitality sector.',
+            'event_type'       => 'academic',
+            'target_audience'  => ['bsit', 'bshm'],
+            'event_date'       => now()->addDays(6)->format('Y-m-d'),
+            'time_start'       => '09:00',
+            'time_end'         => '15:00',
+            'venue'            => 'Convention Hall',
+            'max_participants' => 150,
+        ]);
+
+        $event = Event::where('title', 'Joint IT and Hospitality Summit')->first();
+        $this->assertNotNull($event);
+        $this->assertEqualsCanonicalizing(['bsit', 'bshm'], $event->getTargetAudiences());
+        $this->assertStringContainsString('BSIT Only', $event->target_audience_label);
+        $this->assertStringContainsString('BSHM Only', $event->target_audience_label);
+        $response->assertRedirect('/events/' . $event->id);
+
+        // BSIT and BSHM students should each receive notification
+        $this->assertTrue(Notification::where('user_id', $bsitStudent->id)->where('link', '/events/' . $event->id)->exists());
+        $this->assertTrue(Notification::where('user_id', $bshmStudent->id)->where('link', '/events/' . $event->id)->exists());
+
+        // BSBA student must NOT receive notification
+        $this->assertFalse(Notification::where('user_id', $bsbaStudent->id)->exists());
+
+        // Admin creator must NOT receive notification
+        $this->assertFalse(Notification::where('user_id', $this->admin->id)->exists());
+    }
+
+    public function test_multiple_target_audiences_scoping_dashboard_and_access(): void
+    {
+        $bsitDept = Department::where('code', 'BSIT')->first();
+        $bshmDept = Department::where('code', 'BSHM')->first();
+        $bsbaDept = Department::where('code', 'BSBA-FM')->first();
+
+        $bsitStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bsitDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'IT-MULTI-2',
+            'email'         => 'itmulti2@icoep.test',
+        ]);
+
+        $bshmStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bshmDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'HM-MULTI-2',
+            'email'         => 'hmmulti2@icoep.test',
+        ]);
+
+        $bsbaStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bsbaDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'BA-MULTI-2',
+            'email'         => 'bamulti2@icoep.test',
+        ]);
+
+        $multiEvent = Event::create([
+            'title'            => 'BSIT & BSHM Cross-Colloquium',
+            'objectives'       => 'Joint inter-departmental workshop and project collaboration.',
+            'event_type'       => 'academic',
+            'target_audience'  => ['bsit', 'bshm'],
+            'event_date'       => now()->addDays(5)->format('Y-m-d'),
+            'time_start'       => '13:00',
+            'time_end'         => '16:00',
+            'organizer_id'     => $this->admin->id,
+            'status'           => 'upcoming',
+        ]);
+
+        // Dashboard visibility:
+        // BSIT sees it
+        $this->actingAs($bsitStudent)->get('/dashboard?section=events')
+            ->assertOk()
+            ->assertSee('BSIT &amp; BSHM Cross-Colloquium', false);
+
+        // BSHM sees it
+        $this->actingAs($bshmStudent)->get('/dashboard?section=events')
+            ->assertOk()
+            ->assertSee('BSIT &amp; BSHM Cross-Colloquium', false);
+
+        // BSBA student does NOT see it
+        $this->actingAs($bsbaStudent)->get('/dashboard?section=events')
+            ->assertOk()
+            ->assertDontSee('BSIT &amp; BSHM Cross-Colloquium', false);
+
+        // Direct show access:
+        $this->actingAs($bsitStudent)->get('/events/' . $multiEvent->id)->assertOk();
+        $this->actingAs($bshmStudent)->get('/events/' . $multiEvent->id)->assertOk();
+        $this->actingAs($bsbaStudent)->get('/events/' . $multiEvent->id)->assertForbidden();
+
+        // Registration:
+        // BSIT registers successfully
+        $this->actingAs($bsitStudent)->post('/events/' . $multiEvent->id . '/register')
+            ->assertSessionHas('success');
+        $this->assertTrue(EventRegistration::where('event_id', $multiEvent->id)->where('user_id', $bsitStudent->id)->exists());
+
+        // BSHM registers successfully
+        $this->actingAs($bshmStudent)->post('/events/' . $multiEvent->id . '/register')
+            ->assertSessionHas('success');
+        $this->assertTrue(EventRegistration::where('event_id', $multiEvent->id)->where('user_id', $bshmStudent->id)->exists());
+
+        // BSBA blocked from registering
+        $this->actingAs($bsbaStudent)->post('/events/' . $multiEvent->id . '/register')
+            ->assertSessionHas('error');
+        $this->assertFalse(EventRegistration::where('event_id', $multiEvent->id)->where('user_id', $bsbaStudent->id)->exists());
+    }
+
+    public function test_multiple_target_audiences_with_faculty_and_staff(): void
+    {
+        $multiEvent = Event::create([
+            'title'            => 'Faculty and Staff General Assembly',
+            'objectives'       => 'Campus-wide employee wellness and institutional strategic updates.',
+            'event_type'       => 'other',
+            'target_audience'  => ['faculty', 'staff'],
+            'event_date'       => now()->addDays(7)->format('Y-m-d'),
+            'time_start'       => '08:30',
+            'time_end'         => '11:30',
+            'organizer_id'     => $this->admin->id,
+            'status'           => 'upcoming',
+        ]);
+
+        // Faculty sees it
+        $this->actingAs($this->facultyUser)->get('/dashboard?section=events')
+            ->assertOk()
+            ->assertSee('Faculty and Staff General Assembly');
+
+        // Staff sees it
+        $this->actingAs($this->staffUser)->get('/dashboard?section=events')
+            ->assertOk()
+            ->assertSee('Faculty and Staff General Assembly');
+
+        // Student does not see it
+        $this->actingAs($this->studentUser)->get('/dashboard?section=events')
+            ->assertOk()
+            ->assertDontSee('Faculty and Staff General Assembly');
+
+        // Student gets 403 on direct access
+        $this->actingAs($this->studentUser)->get('/events/' . $multiEvent->id)->assertForbidden();
+    }
 }

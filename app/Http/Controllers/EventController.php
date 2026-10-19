@@ -32,7 +32,10 @@ class EventController extends Controller
         }
 
         if ($audience = $request->get('audience')) {
-            $query->where('target_audience', $audience);
+            $query->where(function ($q) use ($audience) {
+                $q->where('target_audience', $audience)
+                  ->orWhere('target_audience', 'like', '%"' . $audience . '"%');
+            });
         }
 
         $events = $query->withCount('registrations')
@@ -99,7 +102,7 @@ class EventController extends Controller
             'objectives'       => 'required|string|min:10',
             'description'      => 'nullable|string',
             'event_type'       => 'required|in:academic,cultural,sports,spiritual,other',
-            'target_audience'  => 'nullable|string|in:' . implode(',', array_keys(Event::AUDIENCES)),
+            'target_audience'  => 'nullable',
             'event_date'       => 'required|date|after_or_equal:today',
             'time_start'       => 'required|date_format:H:i',
             'time_end'         => 'required|date_format:H:i|after:time_start',
@@ -110,12 +113,31 @@ class EventController extends Controller
             'objectives.min'      => 'Event Targets/Objectives must be at least 10 characters.',
         ]);
 
+        // Normalize target_audience input (supports array or string or multiple)
+        $rawAudience = $request->input('target_audience', [Event::AUDIENCE_ALL]);
+        if (is_string($rawAudience)) {
+            $rawAudience = [$rawAudience];
+        }
+        if (!is_array($rawAudience) || empty($rawAudience)) {
+            $rawAudience = [Event::AUDIENCE_ALL];
+        }
+
+        $validKeys = array_keys(Event::AUDIENCES);
+        $filtered = array_values(array_intersect($rawAudience, $validKeys));
+        if (empty($filtered) || in_array(Event::AUDIENCE_ALL, $filtered, true)) {
+            $finalAudience = [Event::AUDIENCE_ALL];
+        } else {
+            $finalAudience = $filtered;
+        }
+
+        $targetAudienceValue = count($finalAudience) === 1 ? $finalAudience[0] : json_encode($finalAudience);
+
         $event = Event::create([
             'title'            => $request->title,
             'objectives'       => $request->objectives,
             'description'      => $request->description,
             'event_type'       => $request->event_type,
-            'target_audience'  => $request->target_audience ?: Event::AUDIENCE_ALL,
+            'target_audience'  => $targetAudienceValue,
             'event_date'       => $request->event_date,
             'time_start'       => $request->time_start,
             'time_end'         => $request->time_end,

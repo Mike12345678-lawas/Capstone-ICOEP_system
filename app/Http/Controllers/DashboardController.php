@@ -404,7 +404,10 @@ class DashboardController extends Controller
             $query->where('status', $status);
         }
         if ($audience) {
-            $query->where('target_audience', $audience);
+            $query->where(function ($q) use ($audience) {
+                $q->where('target_audience', $audience)
+                  ->orWhere('target_audience', 'like', '%"' . $audience . '"%');
+            });
         }
 
         $data['events']         = $query->orderByDesc('event_date')->paginate(15);

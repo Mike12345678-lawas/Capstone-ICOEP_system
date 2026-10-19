@@ -38,24 +38,61 @@
                         <option value="other" {{ old('event_type') === 'other' ? 'selected' : '' }}>Other</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="target_audience">Target Audience *</label>
-                    <select id="target_audience" name="target_audience" class="form-control" required>
-                        <optgroup label="Campus-Wide & Roles">
-                            <option value="all" {{ old('target_audience', 'all') === 'all' ? 'selected' : '' }}>All Campus (Everyone)</option>
-                            <option value="faculty" {{ old('target_audience') === 'faculty' ? 'selected' : '' }}>Faculty Only</option>
-                            <option value="staff" {{ old('target_audience') === 'staff' ? 'selected' : '' }}>Staff (Non-Teaching) Only</option>
-                            <option value="student" {{ old('target_audience') === 'student' ? 'selected' : '' }}>Students Only</option>
-                        </optgroup>
-                        <optgroup label="Academic Programs / Departments">
-                            <option value="bsit" {{ old('target_audience') === 'bsit' ? 'selected' : '' }}>BSIT Only</option>
-                            <option value="bshm" {{ old('target_audience') === 'bshm' ? 'selected' : '' }}>BSHM Only</option>
-                            <option value="bsba-fm" {{ old('target_audience') === 'bsba-fm' ? 'selected' : '' }}>BSBA-FM Only</option>
-                            <option value="bsed" {{ old('target_audience') === 'bsed' ? 'selected' : '' }}>BSED Only</option>
-                            <option value="beed" {{ old('target_audience') === 'beed' ? 'selected' : '' }}>BEED Only</option>
-                        </optgroup>
-                    </select>
-                    <div class="form-hint">Notifies and shows only to the selected audience.</div>
+                <div class="form-group" style="position: relative;">
+                    <label class="form-label" for="audienceDropdownBtn">Target Audience *</label>
+                    <div class="custom-multiselect" id="audienceMultiselect" style="position: relative;">
+                        <button type="button" class="form-control" id="audienceDropdownBtn" style="display: flex; align-items: center; justify-content: space-between; text-align: left; background: var(--color-surface-50); cursor: pointer; user-select: none;">
+                            <span id="audienceDisplaySummary" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; color: var(--color-surface-800); font-weight: 500;">All Campus (Everyone)</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0; margin-left: 0.5rem; transition: transform 0.2s;" id="audienceDropdownArrow"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+
+                        <div class="custom-multiselect-menu" id="audienceDropdownMenu" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1px solid var(--color-surface-300, #cbd5e1); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1); z-index: 100; max-height: 280px; overflow-y: auto; padding: 0.5rem;">
+                            <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--color-surface-400); letter-spacing: 0.05em; padding: 0.25rem 0.5rem; margin-top: 0.25rem;">
+                                Campus-Wide & Roles
+                            </div>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="all" class="audience-checkbox audience-all" {{ (is_array(old('target_audience')) ? in_array('all', old('target_audience')) : old('target_audience', 'all') === 'all') ? 'checked' : '' }}>
+                                <span style="font-weight: 600;">All Campus (Everyone)</span>
+                            </label>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="faculty" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('faculty', old('target_audience')) ? 'checked' : '' }}>
+                                <span>Faculty Only</span>
+                            </label>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="staff" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('staff', old('target_audience')) ? 'checked' : '' }}>
+                                <span>Staff (Non-Teaching) Only</span>
+                            </label>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="student" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('student', old('target_audience')) ? 'checked' : '' }}>
+                                <span>Students Only</span>
+                            </label>
+
+                            <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--color-surface-400); letter-spacing: 0.05em; padding: 0.5rem 0.5rem 0.25rem 0.5rem; border-top: 1px solid var(--color-surface-200); margin-top: 0.25rem;">
+                                Academic Programs / Departments
+                            </div>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="bsit" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('bsit', old('target_audience')) ? 'checked' : '' }}>
+                                <span>BSIT Only</span>
+                            </label>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="bshm" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('bshm', old('target_audience')) ? 'checked' : '' }}>
+                                <span>BSHM Only</span>
+                            </label>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="bsba-fm" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('bsba-fm', old('target_audience')) ? 'checked' : '' }}>
+                                <span>BSBA-FM Only</span>
+                            </label>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="bsed" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('bsed', old('target_audience')) ? 'checked' : '' }}>
+                                <span>BSED Only</span>
+                            </label>
+                            <label class="multiselect-option" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                                <input type="checkbox" name="target_audience[]" value="beed" class="audience-checkbox" {{ is_array(old('target_audience')) && in_array('beed', old('target_audience')) ? 'checked' : '' }}>
+                                <span>BEED Only</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-hint">Select one or multiple audiences (e.g. BSIT and BSHM).</div>
                 </div>
             </div>
             <div class="form-row">
@@ -92,4 +129,66 @@
         </form>
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const btn = document.getElementById('audienceDropdownBtn');
+    const menu = document.getElementById('audienceDropdownMenu');
+    const arrow = document.getElementById('audienceDropdownArrow');
+    const summary = document.getElementById('audienceDisplaySummary');
+    const allCheckbox = document.querySelector('.audience-all');
+    const checkboxes = document.querySelectorAll('.audience-checkbox');
+
+    if (!btn || !menu || !summary) return;
+
+    function updateSummary() {
+        const checked = Array.from(checkboxes).filter(cb => cb.checked);
+        if (checked.length === 0) {
+            allCheckbox.checked = true;
+            summary.textContent = 'All Campus (Everyone)';
+            return;
+        }
+
+        const isAll = allCheckbox && allCheckbox.checked;
+        if (isAll) {
+            summary.textContent = 'All Campus (Everyone)';
+            return;
+        }
+
+        const labels = checked.map(cb => cb.parentElement.textContent.trim());
+        summary.textContent = labels.join(', ');
+    }
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const isOpen = menu.style.display === 'block';
+        menu.style.display = isOpen ? 'none' : 'block';
+        if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!menu.contains(e.target) && !btn.contains(e.target)) {
+            menu.style.display = 'none';
+            if (arrow) arrow.style.transform = 'rotate(0deg)';
+        }
+    });
+
+    checkboxes.forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            if (cb.value === 'all' && cb.checked) {
+                checkboxes.forEach(other => {
+                    if (other.value !== 'all') other.checked = false;
+                });
+            } else if (cb.value !== 'all' && cb.checked) {
+                if (allCheckbox) allCheckbox.checked = false;
+            }
+            updateSummary();
+        });
+    });
+
+    updateSummary();
+});
+</script>
+@endpush
 @endsection

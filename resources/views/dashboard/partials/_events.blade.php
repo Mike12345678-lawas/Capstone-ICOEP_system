@@ -53,16 +53,25 @@
                         <td data-label="Venue">{{ $event->venue ?: '—' }}</td>
                         <td data-label="Type"><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
                         <td data-label="Audience">
-                            @if($event->target_audience === 'faculty')
-                                <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 600;">Faculty</span>
-                            @elseif($event->target_audience === 'staff')
-                                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;">Staff</span>
-                            @elseif($event->target_audience === 'student')
-                                <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Students</span>
-                            @elseif(in_array($event->target_audience, ['bsit', 'bshm', 'bsba-fm', 'bsed', 'beed']))
-                                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #047857; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600;">{{ $event->target_audience_label }}</span>
-                            @else
+                            @php $auds = $event->getTargetAudiences(); @endphp
+                            @if(in_array('all', $auds, true) || empty($auds))
                                 <span class="badge badge-general">All Campus</span>
+                            @else
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                    @foreach($auds as $aud)
+                                        @if($aud === 'faculty')
+                                            <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 600;">Faculty</span>
+                                        @elseif($aud === 'staff')
+                                            <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;">Staff</span>
+                                        @elseif($aud === 'student')
+                                            <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Students</span>
+                                        @elseif(in_array($aud, ['bsit', 'bshm', 'bsba-fm', 'bsed', 'beed']))
+                                            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #047857; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600;">{{ \App\Models\Event::AUDIENCES[$aud] ?? strtoupper($aud) }}</span>
+                                        @else
+                                            <span class="badge badge-general">{{ ucfirst($aud) }}</span>
+                                        @endif
+                                    @endforeach
+                                </div>
                             @endif
                         </td>
                         <td data-label="Registered">{{ $event->registrations_count }}{{ $event->max_participants > 0 ? '/' . $event->max_participants : '' }}</td>

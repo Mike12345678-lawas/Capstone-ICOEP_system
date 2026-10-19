@@ -68,6 +68,16 @@ class Event extends Model
         ];
     }
 
+    public function setTargetAudienceAttribute($value): void
+    {
+        if (is_array($value)) {
+            $filtered = array_values(array_filter($value));
+            $this->attributes['target_audience'] = count($filtered) === 1 ? $filtered[0] : (empty($filtered) ? self::AUDIENCE_ALL : json_encode($filtered));
+        } else {
+            $this->attributes['target_audience'] = $value ?: self::AUDIENCE_ALL;
+        }
+    }
+
     public function organizer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'organizer_id');
@@ -83,10 +93,51 @@ class Event extends Model
         return $this->registrations()->count();
     }
 
+    /**
+     * Get array of all target audiences for this event.
+     * Supports JSON arrays, comma-separated strings, or single string values.
+     *
+     * @return string[]
+     */
+    public function getTargetAudiences(): array
+    {
+        $val = $this->target_audience;
+
+        if (is_array($val)) {
+            return empty($val) ? [self::AUDIENCE_ALL] : array_values($val);
+        }
+
+        if (empty($val)) {
+            return [self::AUDIENCE_ALL];
+        }
+
+        if (str_starts_with($val, '[') || str_starts_with($val, '{')) {
+            $decoded = json_decode($val, true);
+            if (is_array($decoded) && !empty($decoded)) {
+                return array_values($decoded);
+            }
+        }
+
+        if (str_contains($val, ',')) {
+            return array_filter(array_map('trim', explode(',', $val)));
+        }
+
+        return [$val];
+    }
+
     public function getTargetAudienceLabelAttribute(): string
     {
-        $key = $this->target_audience ?: self::AUDIENCE_ALL;
-        return self::AUDIENCES[$key] ?? ucfirst($key);
+        $audiences = $this->getTargetAudiences();
+        if (in_array(self::AUDIENCE_ALL, $audiences, true)) {
+            return 'All Campus';
+        }
+
+        $labels = [];
+        foreach ($audiences as $aud) {
+            $labels[] = self::AUDIENCES[$aud] ?? ucfirst($aud);
+        }
+
+        return !empty($labels) ? implode(', ', $labels) : 'All Campus';
     }
 
     public function isFull(): bool
@@ -101,8 +152,8 @@ class Event extends Model
 
     public function isVisibleTo(?User $user): bool
     {
-        $audience = $this->target_audience ?: self::AUDIENCE_ALL;
-        if ($audience === self::AUDIENCE_ALL) {
+        $audiences = $this->getTargetAudiences();
+        if (in_array(self::AUDIENCE_ALL, $audiences, true)) {
             return true;
         }
 
@@ -116,19 +167,30 @@ class Event extends Model
         }
 
         $roleName = $user->role?->name;
+        $userDeptCode = strtoupper($user->department?->code ?? '');
 
-        if (array_key_exists($audience, self::DEPARTMENT_AUDIENCES)) {
-            $targetCode = strtoupper(self::DEPARTMENT_AUDIENCES[$audience]);
-            $userCode = strtoupper($user->department?->code ?? '');
-            return $userCode !== '' && $userCode === $targetCode;
+        foreach ($audiences as $audience) {
+            if ($audience === self::AUDIENCE_FACULTY && $roleName === 'Faculty') {
+                return true;
+            }
+
+            if ($audience === self::AUDIENCE_STAFF && in_array($roleName, self::STAFF_ROLES, true)) {
+                return true;
+            }
+
+            if ($audience === self::AUDIENCE_STUDENT && $roleName === 'Student') {
+                return true;
+            }
+
+            if (array_key_exists($audience, self::DEPARTMENT_AUDIENCES)) {
+                $targetCode = strtoupper(self::DEPARTMENT_AUDIENCES[$audience]);
+                if ($userDeptCode !== '' && $userDeptCode === $targetCode) {
+                    return true;
+                }
+            }
         }
 
-        return match ($audience) {
-            self::AUDIENCE_FACULTY => $roleName === 'Faculty',
-            self::AUDIENCE_STAFF   => in_array($roleName, self::STAFF_ROLES, true),
-            self::AUDIENCE_STUDENT => $roleName === 'Student',
-            default                => true,
-        };
+        return false;
     }
 
     public function canUserRegister(?User $user): bool
@@ -141,25 +203,36 @@ class Event extends Model
             return true;
         }
 
-        $audience = $this->target_audience ?: self::AUDIENCE_ALL;
-        if ($audience === self::AUDIENCE_ALL) {
+        $audiences = $this->getTargetAudiences();
+        if (in_array(self::AUDIENCE_ALL, $audiences, true)) {
             return true;
         }
 
         $roleName = $user->role?->name;
+        $userDeptCode = strtoupper($user->department?->code ?? '');
 
-        if (array_key_exists($audience, self::DEPARTMENT_AUDIENCES)) {
-            $targetCode = strtoupper(self::DEPARTMENT_AUDIENCES[$audience]);
-            $userCode = strtoupper($user->department?->code ?? '');
-            return $userCode !== '' && $userCode === $targetCode;
+        foreach ($audiences as $audience) {
+            if ($audience === self::AUDIENCE_FACULTY && $roleName === 'Faculty') {
+                return true;
+            }
+
+            if ($audience === self::AUDIENCE_STAFF && in_array($roleName, self::STAFF_ROLES, true)) {
+                return true;
+            }
+
+            if ($audience === self::AUDIENCE_STUDENT && $roleName === 'Student') {
+                return true;
+            }
+
+            if (array_key_exists($audience, self::DEPARTMENT_AUDIENCES)) {
+                $targetCode = strtoupper(self::DEPARTMENT_AUDIENCES[$audience]);
+                if ($userDeptCode !== '' && $userDeptCode === $targetCode) {
+                    return true;
+                }
+            }
         }
 
-        return match ($audience) {
-            self::AUDIENCE_FACULTY => $roleName === 'Faculty',
-            self::AUDIENCE_STAFF   => in_array($roleName, self::STAFF_ROLES, true),
-            self::AUDIENCE_STUDENT => $roleName === 'Student',
-            default                => true,
-        };
+        return false;
     }
 
     public function scopeActive($query)
@@ -172,7 +245,8 @@ class Event extends Model
         if (!$user) {
             return $query->where(function ($q) {
                 $q->whereNull('target_audience')
-                  ->orWhere('target_audience', self::AUDIENCE_ALL);
+                  ->orWhere('target_audience', self::AUDIENCE_ALL)
+                  ->orWhere('target_audience', 'like', '%"' . self::AUDIENCE_ALL . '"%');
             });
         }
 
@@ -203,8 +277,12 @@ class Event extends Model
 
         return $query->where(function ($q) use ($allowedAudiences, $user) {
             $q->whereNull('target_audience')
-              ->orWhereIn('target_audience', $allowedAudiences)
               ->orWhere('organizer_id', $user->id);
+
+            foreach ($allowedAudiences as $aud) {
+                $q->orWhere('target_audience', $aud)
+                  ->orWhere('target_audience', 'like', '%"' . $aud . '"%');
+            }
         });
     }
 }
