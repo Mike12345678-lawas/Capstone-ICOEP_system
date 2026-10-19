@@ -43,7 +43,7 @@ class PermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $perm) {
-            Permission::create($perm);
+            Permission::firstOrCreate(['name' => $perm['name']], $perm);
         }
 
         // Assign permissions to roles

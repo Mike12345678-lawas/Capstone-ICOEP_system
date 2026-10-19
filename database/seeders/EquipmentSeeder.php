@@ -178,7 +178,10 @@ class EquipmentSeeder extends Seeder
         ];
 
         foreach ($items as $item) {
-            Equipment::create(array_merge($item, ['status' => 'available']));
+            Equipment::firstOrCreate(
+                ['name' => $item['name']],
+                array_merge($item, ['status' => 'available'])
+            );
         }
     }
 }
