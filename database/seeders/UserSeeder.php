@@ -14,9 +14,13 @@ class UserSeeder extends Seeder
     {
         // Resolve department IDs from the canonical academic programs
         $deptBSIT   = Department::where('code', 'BSIT')->first()?->id;
+        $deptBSHM   = Department::where('code', 'BSHM')->first()?->id;
         $deptBSBAFM = Department::where('code', 'BSBA-FM')->first()?->id;
+        $deptBSED   = Department::where('code', 'BSEd')->first()?->id ?? Department::whereRaw('UPPER(code) = ?', ['BSED'])->first()?->id;
+        $deptBEED   = Department::where('code', 'BEEd')->first()?->id ?? Department::whereRaw('UPPER(code) = ?', ['BEED'])->first()?->id;
 
-        // Resolve custodian roles and units
+        // Resolve roles
+        $roleStudent     = Role::where('name', 'Student')->first()?->id ?? 4;
         $roleRegistrar   = Role::where('name', 'Registrar')->first()?->id;
         $roleLibrarian   = Role::where('name', 'Librarian')->first()?->id;
         $roleMaintenance = Role::where('name', 'Maintenance Staff')->first()?->id;
@@ -127,6 +131,7 @@ class UserSeeder extends Seeder
                 'privacy_consent' => true,
                 'privacy_consent_date' => now(),
             ],
+            // Student Accounts (One per canonical academic program)
             [
                 'id_type'       => 'student',
                 'employee_id'   => '24-00001',
@@ -134,7 +139,7 @@ class UserSeeder extends Seeder
                 'last_name'     => 'Reyes',
                 'email'         => 'ana.reyes@slmcb.edu.ph',
                 'password'      => 'Admin01a',
-                'role_id'       => 4,
+                'role_id'       => $roleStudent,
                 'department_id' => $deptBSIT,
                 'custodian_unit_id' => null,
                 'status'        => 'active',
@@ -148,8 +153,50 @@ class UserSeeder extends Seeder
                 'last_name'     => 'Garcia',
                 'email'         => 'carlos.garcia@slmcb.edu.ph',
                 'password'      => 'Admin01a',
-                'role_id'       => 4,
+                'role_id'       => $roleStudent,
                 'department_id' => $deptBSBAFM,
+                'custodian_unit_id' => null,
+                'status'        => 'active',
+                'privacy_consent' => true,
+                'privacy_consent_date' => now(),
+            ],
+            [
+                'id_type'       => 'student',
+                'employee_id'   => '24-00003',
+                'first_name'    => 'Bea',
+                'last_name'     => 'Mendoza',
+                'email'         => 'bea.mendoza@slmcb.edu.ph',
+                'password'      => 'Admin01a',
+                'role_id'       => $roleStudent,
+                'department_id' => $deptBSHM,
+                'custodian_unit_id' => null,
+                'status'        => 'active',
+                'privacy_consent' => true,
+                'privacy_consent_date' => now(),
+            ],
+            [
+                'id_type'       => 'student',
+                'employee_id'   => '24-00004',
+                'first_name'    => 'David',
+                'last_name'     => 'Ramos',
+                'email'         => 'david.ramos@slmcb.edu.ph',
+                'password'      => 'Admin01a',
+                'role_id'       => $roleStudent,
+                'department_id' => $deptBSED,
+                'custodian_unit_id' => null,
+                'status'        => 'active',
+                'privacy_consent' => true,
+                'privacy_consent_date' => now(),
+            ],
+            [
+                'id_type'       => 'student',
+                'employee_id'   => '24-00005',
+                'first_name'    => 'Ella',
+                'last_name'     => 'Villanueva',
+                'email'         => 'ella.villanueva@slmcb.edu.ph',
+                'password'      => 'Admin01a',
+                'role_id'       => $roleStudent,
+                'department_id' => $deptBEED,
                 'custodian_unit_id' => null,
                 'status'        => 'active',
                 'privacy_consent' => true,
@@ -158,7 +205,7 @@ class UserSeeder extends Seeder
         ];
 
         foreach ($users as $userData) {
-            User::firstOrCreate(['email' => $userData['email']], $userData);
+            User::updateOrCreate(['email' => $userData['email']], $userData);
         }
     }
 }
