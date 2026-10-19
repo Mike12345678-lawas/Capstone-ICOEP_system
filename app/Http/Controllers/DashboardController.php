@@ -393,8 +393,9 @@ class DashboardController extends Controller
 
     protected function loadEvents(array &$data, Request $request, $user): void
     {
-        $query  = Event::withCount('registrations');
+        $query  = Event::visibleTo($user)->withCount('registrations');
         $status = $request->get('status', '');
+        $audience = $request->get('audience', '');
 
         if ($data['search']) {
             $query->where('title', 'like', "%{$data['search']}%");
@@ -402,9 +403,13 @@ class DashboardController extends Controller
         if ($status) {
             $query->where('status', $status);
         }
+        if ($audience) {
+            $query->where('target_audience', $audience);
+        }
 
-        $data['events']       = $query->orderByDesc('event_date')->paginate(15);
-        $data['statusFilter'] = $status;
+        $data['events']         = $query->orderByDesc('event_date')->paginate(15);
+        $data['statusFilter']   = $status;
+        $data['audienceFilter'] = $audience;
     }
 
     // ─── ANNOUNCEMENTS ───────────────────────────────────────────────────

@@ -39,8 +39,24 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label class="form-label" for="target_audience">Target Audience *</label>
+                    <select id="target_audience" name="target_audience" class="form-control" required>
+                        <option value="all" {{ old('target_audience', 'all') === 'all' ? 'selected' : '' }}>All Campus (Everyone)</option>
+                        <option value="faculty" {{ old('target_audience') === 'faculty' ? 'selected' : '' }}>Faculty Only</option>
+                        <option value="staff" {{ old('target_audience') === 'staff' ? 'selected' : '' }}>Staff (Non-Teaching) Only</option>
+                        <option value="student" {{ old('target_audience') === 'student' ? 'selected' : '' }}>Students Only</option>
+                    </select>
+                    <div class="form-hint">Notifies and shows only to the selected audience.</div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
                     <label class="form-label" for="event_date">Event Date *</label>
                     <input type="date" id="event_date" name="event_date" class="form-control" required min="{{ date('Y-m-d') }}" value="{{ old('event_date') }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="venue">Venue</label>
+                    <input type="text" id="venue" name="venue" class="form-control" value="{{ old('venue') }}" placeholder="e.g., Main Auditorium">
                 </div>
             </div>
             <div class="form-row">
@@ -53,16 +69,10 @@
                     <input type="time" id="time_end" name="time_end" class="form-control" required value="{{ old('time_end') }}">
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label" for="venue">Venue</label>
-                    <input type="text" id="venue" name="venue" class="form-control" value="{{ old('venue') }}" placeholder="e.g., Main Auditorium">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="max_participants">Max Participants</label>
-                    <input type="number" id="max_participants" name="max_participants" class="form-control" min="0" value="{{ old('max_participants', 0) }}">
-                    <div class="form-hint">Set 0 for unlimited.</div>
-                </div>
+            <div class="form-group">
+                <label class="form-label" for="max_participants">Max Participants</label>
+                <input type="number" id="max_participants" name="max_participants" class="form-control" min="0" value="{{ old('max_participants', 0) }}">
+                <div class="form-hint">Set 0 for unlimited.</div>
             </div>
             <div class="form-group">
                 <label class="form-label" for="description">Description</label>

@@ -14,7 +14,7 @@ class EventController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Event::query();
+        $query = Event::visibleTo(Auth::user());
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -31,25 +31,34 @@ class EventController extends Controller
             $query->where('status', $status);
         }
 
+        if ($audience = $request->get('audience')) {
+            $query->where('target_audience', $audience);
+        }
+
         $events = $query->withCount('registrations')
             ->orderBy('event_date')
             ->paginate(config('icoep.items_per_page'));
 
         return view('events.index', [
-            'pageTitle'    => 'Campus Events',
-            'breadcrumb'   => [
+            'pageTitle'      => 'Campus Events',
+            'breadcrumb'     => [
                 ['label' => 'Dashboard', 'url' => '/dashboard'],
                 ['label' => 'Events'],
             ],
-            'events'       => $events,
-            'search'       => $search,
-            'typeFilter'   => $type,
-            'statusFilter' => $status,
+            'events'         => $events,
+            'search'         => $search,
+            'typeFilter'     => $type,
+            'statusFilter'   => $status,
+            'audienceFilter' => $audience,
         ]);
     }
 
     public function show(Event $event)
     {
+        if (!$event->isVisibleTo(Auth::user())) {
+            abort(403, 'This event is restricted to ' . $event->target_audience_label . '.');
+        }
+
         $event->load(['organizer', 'registrations.user']);
 
         $registration = $event->registrations()->where('user_id', Auth::id())->first();
@@ -90,6 +99,7 @@ class EventController extends Controller
             'objectives'       => 'required|string|min:10',
             'description'      => 'nullable|string',
             'event_type'       => 'required|in:academic,cultural,sports,spiritual,other',
+            'target_audience'  => 'nullable|string|in:all,faculty,staff,student',
             'event_date'       => 'required|date|after_or_equal:today',
             'time_start'       => 'required|date_format:H:i',
             'time_end'         => 'required|date_format:H:i|after:time_start',
@@ -105,6 +115,7 @@ class EventController extends Controller
             'objectives'       => $request->objectives,
             'description'      => $request->description,
             'event_type'       => $request->event_type,
+            'target_audience'  => $request->target_audience ?: Event::AUDIENCE_ALL,
             'event_date'       => $request->event_date,
             'time_start'       => $request->time_start,
             'time_end'         => $request->time_end,
@@ -116,6 +127,9 @@ class EventController extends Controller
 
         AuditLog::log('CREATE_EVENT', 'events', $event->id);
 
+        // Notify only the targeted audience
+        \App\Services\EventNotificationService::notifyAudience($event, Auth::id());
+
         return redirect('/events/' . $event->id)->with('success', 'Event created successfully!');
     }
 
@@ -125,6 +139,10 @@ class EventController extends Controller
      */
     public function register(Event $event)
     {
+        if (!$event->isVisibleTo(Auth::user()) || !$event->canUserRegister(Auth::user())) {
+            return back()->with('error', 'This event is restricted to ' . $event->target_audience_label . '.');
+        }
+
         if (!$event->isUpcoming()) {
             return back()->with('error', 'Registration is closed for this event.');
         }

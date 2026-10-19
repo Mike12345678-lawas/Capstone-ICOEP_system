@@ -55,6 +55,15 @@
                                 @endphp
                                 <span class="badge {{ $statusBadge }}">{{ ucfirst($event->status) }}</span>
                                 <span class="badge {{ $typeBadge }}">{{ ucfirst($event->event_type) }}</span>
+                                @if($event->target_audience === 'faculty')
+                                    <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.3);">Faculty Only</span>
+                                @elseif($event->target_audience === 'staff')
+                                    <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3);">Staff Only</span>
+                                @elseif($event->target_audience === 'student')
+                                    <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3);">Students Only</span>
+                                @else
+                                    <span class="badge badge-general">All Campus</span>
+                                @endif
                             </div>
                             <h3 class="item-card-title">{{ $event->title }}</h3>
                             <div class="item-card-desc">{{ Str::limit($event->description, 100) }}</div>

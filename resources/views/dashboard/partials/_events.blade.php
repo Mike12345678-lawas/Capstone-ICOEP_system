@@ -26,11 +26,19 @@
                 <a href="{{ url('/dashboard?section=events&status=ongoing') }}" class="filter-btn {{ ($statusFilter ?? '') === 'ongoing' ? 'active' : '' }}">Ongoing</a>
                 <a href="{{ url('/dashboard?section=events&status=completed') }}" class="filter-btn {{ ($statusFilter ?? '') === 'completed' ? 'active' : '' }}">Completed</a>
             </div>
+            @if(auth()->user()->hasRole('Administrator'))
+            <div class="filter-group" style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                <a href="{{ url('/dashboard?section=events' . ($statusFilter ? '&status=' . $statusFilter : '')) }}" class="filter-btn {{ empty($audienceFilter) ? 'active' : '' }}">All Audiences</a>
+                <a href="{{ url('/dashboard?section=events&audience=faculty' . ($statusFilter ? '&status=' . $statusFilter : '')) }}" class="filter-btn {{ ($audienceFilter ?? '') === 'faculty' ? 'active' : '' }}">Faculty Only</a>
+                <a href="{{ url('/dashboard?section=events&audience=staff' . ($statusFilter ? '&status=' . $statusFilter : '')) }}" class="filter-btn {{ ($audienceFilter ?? '') === 'staff' ? 'active' : '' }}">Staff Only</a>
+                <a href="{{ url('/dashboard?section=events&audience=student' . ($statusFilter ? '&status=' . $statusFilter : '')) }}" class="filter-btn {{ ($audienceFilter ?? '') === 'student' ? 'active' : '' }}">Students Only</a>
+            </div>
+            @endif
         </form>
         <div class="table-responsive manage-table-responsive">
             <table class="data-table mobile-cards">
                 <thead>
-                    <tr><th>Title</th><th>Date</th><th>Venue</th><th>Type</th><th>Registered</th><th>Status</th><th>Action</th></tr>
+                    <tr><th>Title</th><th>Date</th><th>Venue</th><th>Type</th><th>Audience</th><th>Registered</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                 @forelse($events as $event)
@@ -39,6 +47,17 @@
                         <td data-label="Date">{{ $event->event_date->format('M d, Y') }}</td>
                         <td data-label="Venue">{{ $event->venue ?: '—' }}</td>
                         <td data-label="Type"><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
+                        <td data-label="Audience">
+                            @if($event->target_audience === 'faculty')
+                                <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 600;">Faculty</span>
+                            @elseif($event->target_audience === 'staff')
+                                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;">Staff</span>
+                            @elseif($event->target_audience === 'student')
+                                <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Students</span>
+                            @else
+                                <span class="badge badge-general">All Campus</span>
+                            @endif
+                        </td>
                         <td data-label="Registered">{{ $event->registrations_count }}{{ $event->max_participants > 0 ? '/' . $event->max_participants : '' }}</td>
                         <td data-label="Status">
                             <x-status-badge :status="$event->status" />
@@ -47,7 +66,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted" style="padding: 2rem 1rem;">
+                        <td colspan="8" class="text-center text-muted" style="padding: 2rem 1rem;">
                             <p style="margin-bottom: .5rem;">No events found.</p>
                             @if(request('search') || request('status'))
                                 <a href="{{ url('/dashboard?section=events') }}" class="btn btn-secondary btn-sm">Clear Filters</a>

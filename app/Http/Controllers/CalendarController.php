@@ -70,8 +70,9 @@ class CalendarController extends Controller
                     ];
                 });
 
-            // 4. Fetch campus events (Sports, Academic, Spiritual, Cultural, etc.)
-            $events = Event::whereIn('status', ['upcoming', 'ongoing', 'completed'])
+            // 4. Fetch campus events visible to current user (Sports, Academic, Spiritual, Cultural, etc.)
+            $events = Event::visibleTo(auth()->user())
+                ->whereIn('status', ['upcoming', 'ongoing', 'completed'])
                 ->whereBetween('event_date', [$startDate, $endDate])
                 ->get()
                 ->map(function ($event) {
@@ -124,6 +125,8 @@ class CalendarController extends Controller
                         'extendedProps' => [
                             'type' => 'event',
                             'event_type' => $event->event_type,
+                            'target_audience' => $event->target_audience,
+                            'target_audience_label' => $event->target_audience_label,
                             'description' => $event->description,
                             'venue' => $event->venue,
                             'time' => ($timeStart && $timeEnd) ? "{$timeStart} - {$timeEnd}" : 'All Day',

@@ -25,10 +25,19 @@
         {{-- Description --}}
         <div class="card animate-fade-in-up" style="animation-delay: 100ms;">
             <div class="card-header">
-                <div class="flex gap-sm">
+                <div class="flex gap-sm" style="flex-wrap: wrap;">
                     @php $statusBadge = match($event->status) { 'upcoming' => 'badge-general', 'ongoing' => 'badge-success', 'completed' => 'badge-warning', 'cancelled' => 'badge-error', default => 'badge-general' }; @endphp
                     <span class="badge {{ $statusBadge }}">{{ ucfirst($event->status) }}</span>
                     <span class="badge badge-general">{{ ucfirst($event->event_type) }}</span>
+                    @if($event->target_audience === 'faculty')
+                        <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 600;">Faculty Only</span>
+                    @elseif($event->target_audience === 'staff')
+                        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;">Staff (Non-Teaching) Only</span>
+                    @elseif($event->target_audience === 'student')
+                        <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Students Only</span>
+                    @else
+                        <span class="badge badge-general">All Campus</span>
+                    @endif
                 </div>
             </div>
             <div class="card-body">
@@ -59,6 +68,7 @@
                 <div style="margin-bottom: 1rem;"><strong>Date</strong><br>{{ $event->event_date->format('F d, Y') }}</div>
                 <div style="margin-bottom: 1rem;"><strong>Time</strong><br>{{ \Carbon\Carbon::parse($event->time_start)->format('h:i A') }} - {{ \Carbon\Carbon::parse($event->time_end)->format('h:i A') }}</div>
                 <div style="margin-bottom: 1rem;"><strong>Venue</strong><br>{{ $event->venue ?: 'TBA' }}</div>
+                <div style="margin-bottom: 1rem;"><strong>Audience</strong><br><span style="font-weight: 600;">{{ $event->target_audience_label }}</span></div>
                 <div style="margin-bottom: 1rem;"><strong>Registered</strong><br>{{ $event->registrations->count() }}{{ $event->max_participants > 0 ? ' / ' . $event->max_participants : '' }}</div>
                 <div><strong>Type</strong><br>{{ ucfirst($event->event_type) }}</div>
             </div>
@@ -88,6 +98,12 @@
                     </form>
                 @elseif($event->isFull())
                     <p class="text-muted" style="font-weight: 500;">Event is full — registration closed.</p>
+                @elseif(!auth()->user() || !$event->canUserRegister(auth()->user()))
+                    <div style="padding: 1rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; color: #b91c1c; font-size: 0.875rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; display: inline-block;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <div style="font-weight: 600;">Restricted Registration</div>
+                        <p style="margin: 0.25rem 0 0 0;">This event is open for registration only to <strong>{{ $event->target_audience_label }}</strong>.</p>
+                    </div>
                 @else
                     <form method="POST" action="{{ url('/events/' . $event->id . '/register') }}">
                         @csrf
