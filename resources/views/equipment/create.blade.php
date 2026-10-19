@@ -59,6 +59,25 @@
                 @error('status') <span class="form-error">{{ $message }}</span> @enderror
             </div>
 
+            @if(isset($isUnitScoped) && $isUnitScoped)
+                <div class="form-group">
+                    <label class="form-label" for="custodian_unit_name">Custodian Unit</label>
+                    <input type="text" id="custodian_unit_name" class="form-control" value="{{ $userUnit?->name }}" disabled>
+                    <span class="form-hint">Automatically assigned to your unit.</span>
+                </div>
+            @else
+                <div class="form-group">
+                    <label class="form-label" for="custodian_unit_id">Custodian Unit *</label>
+                    <select id="custodian_unit_id" name="custodian_unit_id" class="form-select @error('custodian_unit_id') error @enderror" required>
+                        <option value="">— Select Custodian Unit —</option>
+                        @foreach($custodianUnits as $u)
+                            <option value="{{ $u->id }}" {{ old('custodian_unit_id') == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('custodian_unit_id') <span class="form-error">{{ $message }}</span> @enderror
+                </div>
+            @endif
+
             <div class="form-actions" style="grid-column: 1 / -1;">
                 <button type="submit" class="btn btn-primary">Create Equipment</button>
                 <a href="{{ url('/dashboard?section=inventory') }}" class="btn btn-secondary">Cancel</a>

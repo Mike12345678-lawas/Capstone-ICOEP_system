@@ -46,7 +46,7 @@
                     <label class="form-label" for="role_id">Role *</label>
                     <select id="role_id" name="role_id" class="form-control form-select" required>
                         @foreach($roles as $role)
-                            <option value="{{ $role->id }}" {{ old('role_id') == $role->id ? 'selected' : '' }}>{{ $role->name }}</option>
+                            <option value="{{ $role->id }}" data-name="{{ $role->name }}" {{ old('role_id') == $role->id ? 'selected' : '' }}>{{ $role->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -57,6 +57,16 @@
                         <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
                     </select>
                 </div>
+            </div>
+            <div class="form-group" id="custodian_unit_group" style="display: none;">
+                <label class="form-label" for="custodian_unit_id">Custodian Unit <span id="custodian_unit_required_star">*</span></label>
+                <select id="custodian_unit_id" name="custodian_unit_id" class="form-control form-select">
+                    <option value="">— Select Custodian Unit —</option>
+                    @foreach($custodianUnits as $unit)
+                        <option value="{{ $unit->id }}" {{ old('custodian_unit_id') == $unit->id ? 'selected' : '' }}>{{ $unit->name }}</option>
+                    @endforeach
+                </select>
+                <span class="form-hint">Required for unit staff (Registrar, Librarian, Maintenance Staff, ComLab Staff).</span>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -102,5 +112,30 @@
             ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="23" x2="23" y2="23"></line></svg>'
             : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const custodianRoles = ['Registrar', 'Librarian', 'Maintenance Staff', 'ComLab Staff'];
+        const roleSelect = document.getElementById('role_id');
+        const unitGroup = document.getElementById('custodian_unit_group');
+        const unitSelect = document.getElementById('custodian_unit_id');
+
+        function checkCustodianRole() {
+            if (!roleSelect || !unitGroup) return;
+            const selectedOption = roleSelect.options[roleSelect.selectedIndex];
+            const roleName = selectedOption ? selectedOption.getAttribute('data-name') : '';
+            if (custodianRoles.includes(roleName)) {
+                unitGroup.style.display = 'block';
+                if (unitSelect) unitSelect.required = true;
+            } else {
+                unitGroup.style.display = 'none';
+                if (unitSelect) unitSelect.required = false;
+            }
+        }
+
+        if (roleSelect) {
+            roleSelect.addEventListener('change', checkCustodianRole);
+            checkCustodianRole();
+        }
+    });
 </script>
 @endsection

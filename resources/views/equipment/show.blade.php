@@ -16,12 +16,43 @@
             <div class="card-header"><h3 class="card-title">Item Details</h3></div>
             <div class="card-body">
                 <p style="line-height: 1.8;">{{ $equipment->description ?: 'No description available.' }}</p>
-                <div style="margin-top: 1rem;">
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                     <span class="badge badge-general">{{ $equipment->category }}</span>
+                    <span class="badge badge-general">{{ $equipment->custodianUnit?->name ?? 'Unassigned' }}</span>
                     <x-status-badge :status="$equipment->status" />
                 </div>
             </div>
         </div>
+
+        {{-- Active Requests for this Item (Shown to Custodians of this unit & Admin) --}}
+        @if(isset($activeRequests) && $activeRequests->isNotEmpty())
+        <div class="card animate-fade-in-up" style="animation-delay: 125ms; margin-top: 1.5rem; border-left: 4px solid var(--color-brand-600, #2563eb);">
+            <div class="card-header">
+                <h3 class="card-title">Active Requests for this Item ({{ $activeRequests->count() }})</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table responsive-card-table">
+                    <thead>
+                        <tr><th>Borrower</th><th>Qty</th><th>Purpose</th><th>Schedule</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach($activeRequests as $aReq)
+                        <tr>
+                            <td data-label="Borrower" style="font-weight: 600;">{{ $aReq->user?->full_name }}</td>
+                            <td data-label="Qty">{{ $aReq->quantity }}</td>
+                            <td data-label="Purpose">{{ $aReq->purpose }}</td>
+                            <td data-label="Schedule" style="font-size: .85rem;">
+                                <span>{{ $aReq->date_needed?->format('M d, Y') ?? '—' }}</span>
+                                <div class="text-muted" style="font-size: .75rem;">Due {{ $aReq->expected_return_date?->format('M d, Y') ?? '—' }}</div>
+                            </td>
+                            <td data-label="Status"><x-status-badge :status="$aReq->status" /></td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @endif
 
         {{-- User's Own Borrow Requests for this Item --}}
         @if(isset($myRequests) && $myRequests->isNotEmpty())

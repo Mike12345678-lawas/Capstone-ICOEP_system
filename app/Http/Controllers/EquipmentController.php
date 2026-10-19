@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\CustodianUnit;
 use App\Models\Equipment;
 use App\Models\EquipmentRequest;
 use App\Models\Notification;
 use App\Services\AlternativeSuggester;
+use App\Services\CustodianNotificationService;
 use App\Services\ResourceSolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +18,7 @@ class EquipmentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Equipment::query();
+        $query = Equipment::with('custodianUnit');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -47,11 +49,23 @@ class EquipmentController extends Controller
 
     public function show(Equipment $equipment)
     {
-        $activeRequests = $equipment->requests()
-            ->with('user')
-            ->whereIn('status', ['pending', 'approved', 'borrowed'])
-            ->orderByDesc('created_at')
-            ->get();
+        $equipment->loadMissing('custodianUnit');
+        $user = Auth::user();
+
+        // Unit-scoped users see only their own unit's active requests
+        $canSeeActiveRequests = false;
+        if ($user) {
+            $isGlobal = $user->hasRole('Administrator') || $user->hasPermission('equipment.manage');
+            $canSeeActiveRequests = $isGlobal || ($user->custodian_unit_id && $user->custodian_unit_id === $equipment->custodian_unit_id);
+        }
+
+        $activeRequests = $canSeeActiveRequests
+            ? $equipment->requests()
+                ->with('user')
+                ->whereIn('status', ['pending', 'approved', 'borrowed'])
+                ->orderByDesc('created_at')
+                ->get()
+            : collect();
 
         $myRequests = $equipment->requests()
             ->where('user_id', Auth::id())
@@ -77,32 +91,61 @@ class EquipmentController extends Controller
         ]);
     }
 
-    // ─── Admin CRUD for Equipment Items ──────────────────────────────────
+    // ─── Admin & Custodian CRUD for Equipment Items ──────────────────────
 
     public function create()
     {
+        $user = Auth::user();
+        $isUnitScoped = $user && $user->hasPermission('inventory.manage_own') && !$user->hasRole('Administrator') && !$user->hasRole('Staff');
+        if ($isUnitScoped && !$user->custodian_unit_id) {
+            abort(403, 'You are not assigned to a custodian unit.');
+        }
+
         $categories = Equipment::select('category')->distinct()->orderBy('category')->pluck('category');
+        $custodianUnits = CustodianUnit::orderBy('name')->get();
 
         return view('equipment.create', [
-            'pageTitle'  => 'Add Equipment',
-            'breadcrumb' => [
+            'pageTitle'      => 'Add Equipment',
+            'breadcrumb'     => [
                 ['label' => 'Dashboard', 'url' => '/dashboard'],
                 ['label' => 'Equipment Inventory', 'url' => '/dashboard?section=inventory'],
                 ['label' => 'Add Equipment'],
             ],
-            'categories' => $categories,
+            'categories'     => $categories,
+            'custodianUnits' => $custodianUnits,
+            'isUnitScoped'   => $isUnitScoped,
+            'userUnit'       => $user?->custodianUnit,
         ]);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $user = Auth::user();
+        $isUnitScoped = $user && $user->hasPermission('inventory.manage_own') && !$user->hasRole('Administrator') && !$user->hasRole('Staff');
+
+        $rules = [
             'name'        => 'required|string|max:255',
             'category'    => 'required|string|max:100',
             'description' => 'nullable|string|max:1000',
             'quantity'    => 'required|integer|min:1',
             'status'      => 'required|in:available,maintenance,retired',
-        ]);
+        ];
+
+        if ($user && $user->hasRole('Administrator')) {
+            $rules['custodian_unit_id'] = 'required|integer|exists:custodian_units,id';
+        } elseif ($isUnitScoped) {
+            if (!$user->custodian_unit_id) {
+                abort(403, 'You are not assigned to a custodian unit.');
+            }
+        } else {
+            $rules['custodian_unit_id'] = 'nullable|integer|exists:custodian_units,id';
+        }
+
+        $validated = $request->validate($rules);
+
+        if ($isUnitScoped) {
+            $validated['custodian_unit_id'] = $user->custodian_unit_id;
+        }
 
         $validated['available_quantity'] = $validated['quantity'];
 
@@ -116,30 +159,64 @@ class EquipmentController extends Controller
 
     public function edit(Equipment $equipment)
     {
+        $user = Auth::user();
+        if ($user && !$user->hasRole('Administrator') && !$user->hasRole('Staff')) {
+            if (!$user->custodian_unit_id || $equipment->custodian_unit_id !== $user->custodian_unit_id) {
+                abort(403, 'You can only edit equipment belonging to your custodian unit.');
+            }
+        }
+
         $categories = Equipment::select('category')->distinct()->orderBy('category')->pluck('category');
+        $custodianUnits = CustodianUnit::orderBy('name')->get();
+        $isUnitScoped = $user && $user->hasPermission('inventory.manage_own') && !$user->hasRole('Administrator') && !$user->hasRole('Staff');
 
         return view('equipment.edit', [
-            'pageTitle'  => 'Edit: ' . $equipment->name,
-            'breadcrumb' => [
+            'pageTitle'      => 'Edit: ' . $equipment->name,
+            'breadcrumb'     => [
                 ['label' => 'Dashboard', 'url' => '/dashboard'],
                 ['label' => 'Equipment Inventory', 'url' => '/dashboard?section=inventory'],
                 ['label' => 'Edit'],
             ],
-            'equipment'  => $equipment,
-            'categories' => $categories,
+            'equipment'      => $equipment,
+            'categories'     => $categories,
+            'custodianUnits' => $custodianUnits,
+            'isUnitScoped'   => $isUnitScoped,
+            'userUnit'       => $user?->custodianUnit,
         ]);
     }
 
     public function update(Request $request, Equipment $equipment)
     {
-        $validated = $request->validate([
+        $user = Auth::user();
+        $isUnitScoped = $user && $user->hasPermission('inventory.manage_own') && !$user->hasRole('Administrator') && !$user->hasRole('Staff');
+
+        if ($user && !$user->hasRole('Administrator') && !$user->hasRole('Staff')) {
+            if (!$user->custodian_unit_id || $equipment->custodian_unit_id !== $user->custodian_unit_id) {
+                abort(403, 'You can only edit equipment belonging to your custodian unit.');
+            }
+        }
+
+        $rules = [
             'name'               => 'required|string|max:255',
             'category'           => 'required|string|max:100',
             'description'        => 'nullable|string|max:1000',
             'quantity'           => 'required|integer|min:1',
             'available_quantity' => 'required|integer|min:0',
             'status'             => 'required|in:available,maintenance,retired',
-        ]);
+        ];
+
+        if ($user && $user->hasRole('Administrator')) {
+            $rules['custodian_unit_id'] = 'required|integer|exists:custodian_units,id';
+        } elseif (!$isUnitScoped) {
+            $rules['custodian_unit_id'] = 'nullable|integer|exists:custodian_units,id';
+        }
+
+        $validated = $request->validate($rules);
+
+        // Unit field cannot be modified by unit users
+        if ($isUnitScoped) {
+            unset($validated['custodian_unit_id']);
+        }
 
         // Ensure available_quantity doesn't exceed total
         if ($validated['available_quantity'] > $validated['quantity']) {
@@ -156,6 +233,13 @@ class EquipmentController extends Controller
 
     public function destroy(Equipment $equipment)
     {
+        $user = Auth::user();
+        if ($user && !$user->hasRole('Administrator') && !$user->hasRole('Staff')) {
+            if (!$user->custodian_unit_id || $equipment->custodian_unit_id !== $user->custodian_unit_id) {
+                abort(403, 'You can only delete equipment belonging to your custodian unit.');
+            }
+        }
+
         // Prevent deletion if there are active borrow requests
         $activeCount = $equipment->requests()
             ->whereIn('status', ['pending', 'approved', 'borrowed'])
@@ -362,6 +446,10 @@ class EquipmentController extends Controller
             '/equipment/' . $equipmentRequest->equipment_id
         );
 
+        if (in_array($request->status, ['approved', 'borrowed'], true)) {
+            CustodianNotificationService::notifyPickupReady($equipmentRequest->fresh(), Auth::id());
+        }
+
         if ($request->expectsJson()) {
             $equipmentRequest->refresh();
             return response()->json(['success' => true, 'status' => $equipmentRequest->status]);
@@ -413,6 +501,7 @@ class EquipmentController extends Controller
                 'success',
                 '/equipment/' . $eqReq->equipment_id
             );
+            CustodianNotificationService::notifyPickupReady($eqReq->fresh(), Auth::id());
             $succeeded++;
         }
 

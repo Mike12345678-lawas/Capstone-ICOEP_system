@@ -1,7 +1,13 @@
 <div class="page-header animate-fade-in-up">
     <div>
         <h1 class="page-title">Equipment Inventory</h1>
-        <p class="page-subtitle">Manage stock levels, add new items, and track overall equipment inventory.</p>
+        <p class="page-subtitle">
+            @if(isset($isUnitScoped) && $isUnitScoped && isset($userUnit))
+                Managing equipment inventory for <strong>{{ $userUnit->name }}</strong>.
+            @else
+                Manage stock levels, add new items, and track overall equipment inventory across all units.
+            @endif
+        </p>
     </div>
     <div class="header-actions-mobile">
         <a href="{{ url('/equipment/create') }}" class="btn btn-primary">
@@ -28,7 +34,7 @@
         <div class="table-responsive">
             <table class="data-table mobile-cards">
                 <thead>
-                    <tr><th>Name</th><th>Category</th><th>Total Qty</th><th>Available</th><th>Borrowed</th><th>Status</th><th>Actions</th></tr>
+                    <tr><th>Name</th><th>Category</th><th>Unit</th><th>Total Qty</th><th>Available</th><th>Borrowed</th><th>Status</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                 @forelse($inventoryItems as $item)
@@ -36,6 +42,13 @@
                     <tr>
                         <td data-label="Name" style="font-weight: 600;">{{ $item->name }}</td>
                         <td data-label="Category"><span class="badge badge-general">{{ $item->category }}</span></td>
+                        <td data-label="Unit">
+                            @if($item->custodianUnit)
+                                <span class="badge badge-general">{{ $item->custodianUnit->name }}</span>
+                            @else
+                                <span class="badge badge-warning" style="background:#fef3c7;color:#92400e;">Unassigned</span>
+                            @endif
+                        </td>
                         <td data-label="Total Qty">{{ $item->quantity }}</td>
                         <td data-label="Available">
                             <span style="font-weight: 600; color: {{ $item->available_quantity > 0 ? '#10b981' : '#ef4444' }};">
@@ -58,7 +71,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted" style="padding: 2rem 1rem;">
+                        <td colspan="8" class="text-center text-muted" style="padding: 2rem 1rem;">
                             <p style="margin-bottom: .5rem;">No equipment items found.</p>
                             @if(request('search') || request('category'))
                                 <a href="{{ url('/dashboard?section=inventory') }}" class="btn btn-secondary btn-sm">Clear Filters</a>

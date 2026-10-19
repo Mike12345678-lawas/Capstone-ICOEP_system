@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\CustodianUnit;
 use App\Models\Department;
 use App\Models\Role;
 use App\Models\User;
@@ -65,8 +66,9 @@ class UserController extends Controller
 
     public function create()
     {
-        $roles       = Role::orderBy('id')->get();
-        $departments = Department::orderBy('id')->get();
+        $roles          = Role::orderBy('id')->get();
+        $departments    = Department::orderBy('id')->get();
+        $custodianUnits = CustodianUnit::orderBy('name')->get();
 
         return view('users.create', [
             'pageTitle' => 'Create User',
@@ -75,8 +77,9 @@ class UserController extends Controller
                 ['label' => 'User Management', 'url' => '/users'],
                 ['label' => 'Create User'],
             ],
-            'roles'       => $roles,
-            'departments' => $departments,
+            'roles'          => $roles,
+            'departments'    => $departments,
+            'custodianUnits' => $custodianUnits,
         ]);
     }
 
@@ -111,8 +114,9 @@ class UserController extends Controller
             abort(403);
         }
 
-        $roles       = Role::orderBy('id')->get();
-        $departments = Department::orderBy('id')->get();
+        $roles          = Role::orderBy('id')->get();
+        $departments    = Department::orderBy('id')->get();
+        $custodianUnits = CustodianUnit::orderBy('name')->get();
 
         $breadcrumb = [['label' => 'Dashboard', 'url' => '/dashboard']];
         if (!$isSelf && Auth::user()->hasPermission('user.view')) {
@@ -121,12 +125,13 @@ class UserController extends Controller
         $breadcrumb[] = ['label' => $isSelf ? 'My Profile' : 'Edit User'];
 
         return view('users.edit', [
-            'pageTitle'   => $isSelf ? 'My Profile' : 'Edit User',
-            'breadcrumb'  => $breadcrumb,
-            'user'        => $user,
-            'roles'       => $roles,
-            'departments' => $departments,
-            'isSelf'      => $isSelf,
+            'pageTitle'      => $isSelf ? 'My Profile' : 'Edit User',
+            'breadcrumb'     => $breadcrumb,
+            'user'           => $user,
+            'roles'          => $roles,
+            'departments'    => $departments,
+            'custodianUnits' => $custodianUnits,
+            'isSelf'         => $isSelf,
         ]);
     }
 
@@ -148,7 +153,8 @@ class UserController extends Controller
 
         // Admin-only fields
         if (!$isSelf && Auth::user()->hasPermission('user.edit')) {
-            $updateData['role_id'] = $validated['role_id'] ?? $user->role_id;
+            $updateData['role_id']           = $validated['role_id'] ?? $user->role_id;
+            $updateData['custodian_unit_id'] = $validated['custodian_unit_id'] ?? null;
 
             if (isset($validated['status'])) {
                 $newStatus = $validated['status'];

@@ -29,10 +29,14 @@ class ResourceSolver
      * Priority tiers — lower number = higher priority.
      */
     public const ROLE_PRIORITY = [
-        'Administrator' => 1,
-        'Faculty'       => 2,
-        'Staff'         => 2,
-        'Student'       => 3,
+        'Administrator'     => 1,
+        'Faculty'           => 2,
+        'Staff'             => 2,
+        'Registrar'         => 2,
+        'Librarian'         => 2,
+        'Maintenance Staff' => 2,
+        'ComLab Staff'      => 2,
+        'Student'           => 3,
     ];
 
     /**
@@ -652,6 +656,10 @@ class ResourceSolver
                     '/dashboard?section=borrowed-equipment'
                 );
 
+                DB::afterCommit(function () use ($eqRequest) {
+                    CustodianNotificationService::notifyPickupReady($eqRequest);
+                });
+
                 return [
                     'status'  => 'approved',
                     'message' => 'Equipment borrow request approved! Track and return your equipment below.',
@@ -788,6 +796,10 @@ class ResourceSolver
                     '/equipment/' . $equipment->id
                 );
 
+                DB::afterCommit(function () use ($lockedReq) {
+                    CustodianNotificationService::notifyPickupReady($lockedReq);
+                });
+
                 return ['status' => 'approved', 'action' => 'approved', 'request' => $lockedReq];
             }
 
@@ -875,6 +887,10 @@ class ResourceSolver
                 'success',
                 '/equipment/' . $equipment->id
             );
+
+            DB::afterCommit(function () use ($lockedReq) {
+                CustodianNotificationService::notifyPickupReady($lockedReq);
+            });
 
             return ['status' => 'approved', 'action' => 'preempted_and_approved', 'request' => $lockedReq];
         });

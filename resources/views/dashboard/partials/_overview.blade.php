@@ -90,6 +90,42 @@
 </div>
 @endif
 
+@if(isset($unitStats))
+<div class="grid grid-3 animate-fade-in-up" style="animation-delay: 100ms; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(14, 165, 233, 0.1); color: #0ea5e9;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+        </div>
+        <div class="stat-content">
+            <a href="{{ url('/dashboard?section=inventory') }}" style="text-decoration:none;color:inherit;">
+                <span class="stat-value">{{ $unitStats['total_equipment'] }}</span>
+                <span class="stat-label">{{ $unitStats['unit_name'] }} Equipment</span>
+            </a>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div class="stat-content">
+            <span class="stat-value">{{ $unitStats['pending_borrows'] }}</span>
+            <span class="stat-label">Pending Requests</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <div class="stat-content">
+            <a href="{{ url('/dashboard?section=pickup-queue') }}" style="text-decoration:none;color:inherit;">
+                <span class="stat-value">{{ $unitStats['pickup_queue'] }}</span>
+                <span class="stat-label">Ready for Pickup</span>
+            </a>
+        </div>
+    </div>
+</div>
+@endif
+
 <div class="grid grid-2 animate-fade-in-up" style="animation-delay: 200ms;">
     {{-- Recent Reservations --}}
     <div class="card">

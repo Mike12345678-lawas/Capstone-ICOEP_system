@@ -34,6 +34,7 @@
                             <div class="item-card-meta">
                                 <span class="badge {{ $item->available_quantity > 0 ? 'badge-success' : 'badge-error' }}">{{ $item->available_quantity > 0 ? 'Available' : 'Unavailable' }}</span>
                                 <span class="badge badge-general">{{ $item->category }}</span>
+                                <span class="badge badge-general">{{ $item->custodianUnit?->name ?? 'Unassigned' }}</span>
                             </div>
                             <h3 class="item-card-title">{{ $item->name }}</h3>
                             <div class="item-card-desc">{{ Str::limit($item->description, 80) }}</div>

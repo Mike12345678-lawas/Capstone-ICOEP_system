@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             PermissionSeeder::class,
             DepartmentSeeder::class,   // must run before UserSeeder (FK dependency)
+            CustodianUnitSeeder::class,
             UserSeeder::class,
             FacilitySeeder::class,
             FacilityReservationSeeder::class,

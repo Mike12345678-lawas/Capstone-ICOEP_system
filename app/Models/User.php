@@ -14,7 +14,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         'id_type', 'employee_id', 'first_name', 'last_name', 'email', 'password',
-        'role_id', 'department_id', 'phone', 'avatar', 'status',
+        'role_id', 'department_id', 'custodian_unit_id', 'phone', 'avatar', 'status',
         'login_attempts', 'locked_until', 'last_login',
         'last_activity_at', 'deactivated_at', 'deactivation_reason', 'inactivity_warned_at',
         'privacy_consent', 'privacy_consent_date',
@@ -47,6 +47,11 @@ class User extends Authenticatable
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function custodianUnit(): BelongsTo
+    {
+        return $this->belongsTo(CustodianUnit::class);
     }
 
     public function notifications(): HasMany

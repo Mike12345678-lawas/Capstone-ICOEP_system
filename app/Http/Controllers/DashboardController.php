@@ -43,9 +43,10 @@ class DashboardController extends Controller
             'history'                            => $this->loadHistory($data, $request, $user),
             'events'                             => $this->loadEvents($data, $request, $user),
             'announcements'    => $this->loadAnnouncements($data, $request),
-            'users'            => $this->loadUsers($data, $request, $user),
-            'inventory'        => $this->loadInventory($data, $request, $user),
-            'manage-bookings'  => $this->loadManageBookings($data, $request),
+            'users'             => $this->loadUsers($data, $request, $user),
+            'inventory'         => $this->loadInventory($data, $request, $user),
+            'pickup-queue'      => $this->loadPickupQueue($data, $request, $user),
+            'manage-bookings'   => $this->loadManageBookings($data, $request),
             'manage-equipment'  => $this->loadManageEquipment($data, $request),
             'equipment-returns' => $this->loadEquipmentReturns($data, $request),
             'reports'          => $this->loadReports($data, $request),
@@ -73,16 +74,29 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $isUnitScoped = $user->custodian_unit_id && !$user->hasRole('Administrator') && !$user->hasRole('Staff');
+
         if ($user->hasPermission('dashboard.admin_stats')) {
             $data['stats'] = [
                 'total_users'          => User::whereNull('deleted_at')->count(),
                 'active_users'         => User::active()->count(),
                 'total_facilities'     => Facility::count(),
                 'pending_reservations' => FacilityReservation::pending()->count(),
-                'total_equipment'      => Equipment::count(),
-                'pending_borrows'      => EquipmentRequest::pending()->count(),
+                'total_equipment'      => $isUnitScoped
+                    ? Equipment::where('custodian_unit_id', $user->custodian_unit_id)->count()
+                    : Equipment::count(),
+                'pending_borrows'      => $isUnitScoped
+                    ? EquipmentRequest::pending()->whereHas('equipment', fn($q) => $q->where('custodian_unit_id', $user->custodian_unit_id))->count()
+                    : EquipmentRequest::pending()->count(),
                 'upcoming_events'      => Event::active()->count(),
                 'total_announcements'  => Announcement::active()->whereNull('deleted_at')->count(),
+            ];
+        } elseif ($isUnitScoped) {
+            $data['unitStats'] = [
+                'unit_name'       => $user->custodianUnit?->name ?? 'My Unit',
+                'total_equipment' => Equipment::where('custodian_unit_id', $user->custodian_unit_id)->count(),
+                'pending_borrows' => EquipmentRequest::pending()->whereHas('equipment', fn($q) => $q->where('custodian_unit_id', $user->custodian_unit_id))->count(),
+                'pickup_queue'    => EquipmentRequest::whereIn('status', ['approved', 'borrowed'])->whereHas('equipment', fn($q) => $q->where('custodian_unit_id', $user->custodian_unit_id))->count(),
             ];
         }
 
@@ -149,7 +163,7 @@ class DashboardController extends Controller
 
     protected function loadEquipment(array &$data, Request $request): void
     {
-        $query    = Equipment::query();
+        $query    = Equipment::with('custodianUnit');
         $category = $request->get('category', '');
 
         if ($data['search']) {
@@ -458,16 +472,24 @@ class DashboardController extends Controller
         $data['departmentFilter'] = $department;
     }
 
-    // ─── INVENTORY (Admin CRUD) ──────────────────────────────────────────
+    // ─── INVENTORY (Admin / Custodians) ──────────────────────────────────
 
     protected function loadInventory(array &$data, Request $request, $user): void
     {
-        if (!$user->hasPermission('equipment.manage')) {
+        if (!$user->hasPermission('equipment.manage') && !$user->hasPermission('inventory.manage_own')) {
             abort(403);
         }
 
-        $query  = Equipment::query();
+        $query  = Equipment::with('custodianUnit');
         $status = $request->get('status', '');
+
+        $isUnitScoped = $user->hasPermission('inventory.manage_own') && !$user->hasRole('Administrator') && !$user->hasRole('Staff');
+        if ($isUnitScoped) {
+            if (!$user->custodian_unit_id) {
+                abort(403, 'You are not assigned to a custodian unit.');
+            }
+            $query->where('custodian_unit_id', $user->custodian_unit_id);
+        }
 
         if ($data['search']) {
             $query->where(function ($q) use ($data) {
@@ -481,6 +503,45 @@ class DashboardController extends Controller
 
         $data['inventoryItems'] = $query->orderBy('name')->paginate(15);
         $data['statusFilter']   = $status;
+        $data['isUnitScoped']   = $isUnitScoped;
+        $data['userUnit']       = $user->custodianUnit;
+    }
+
+    // ─── PICKUP QUEUE (Custodians / Admin) ────────────────────────────────
+
+    protected function loadPickupQueue(array &$data, Request $request, $user): void
+    {
+        $isCustodian = $user->custodian_unit_id || $user->hasPermission('inventory.manage_own');
+        $isAdmin = $user->hasRole('Administrator') || $user->hasPermission('equipment.approve') || $user->hasRole('Staff');
+
+        if (!$isCustodian && !$isAdmin) {
+            abort(403);
+        }
+
+        $query = EquipmentRequest::with(['equipment.custodianUnit', 'user'])
+            ->whereIn('status', ['approved', 'borrowed']);
+
+        $isUnitScoped = $isCustodian && !$user->hasRole('Administrator') && !$user->hasRole('Staff');
+        if ($isUnitScoped) {
+            $query->whereHas('equipment', fn($q) => $q->where('custodian_unit_id', $user->custodian_unit_id));
+        }
+
+        if ($data['search']) {
+            $search = $data['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('purpose', 'like', "%{$search}%")
+                  ->orWhereHas('equipment', fn($eq) => $eq->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('first_name', 'like', "%{$search}%")
+                         ->orWhere('last_name', 'like', "%{$search}%")
+                         ->orWhere('employee_id', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $data['pickupRequests'] = $query->orderBy('date_needed')->paginate(15);
+        $data['isUnitScoped']   = $isUnitScoped;
+        $data['userUnit']       = $user->custodianUnit;
     }
 
     // ─── MANAGE BOOKINGS (Admin/Staff) ───────────────────────────────────

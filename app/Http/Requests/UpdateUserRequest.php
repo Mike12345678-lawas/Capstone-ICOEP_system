@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,16 @@ class UpdateUserRequest extends FormRequest
             // role_id is optional on self-edit; falls back to existing role
             'employee_id' => $this->employeeIdRule($user?->role_id),
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'custodian_unit_id' => [
+                'nullable',
+                'integer',
+                'exists:custodian_units,id',
+                Rule::requiredIf(function () use ($user) {
+                    $roleId = $this->input('role_id') ?? $user?->role_id;
+                    $role = Role::find($roleId);
+                    return $role && in_array($role->name, ['Registrar', 'Librarian', 'Maintenance Staff', 'ComLab Staff'], true);
+                }),
+            ],
             'phone'       => ['nullable', 'string', 'max:20'],
             // Password is optional on update; require confirmation if provided
             'password'    => ['nullable', 'string', 'alpha_num', 'max:8', 'confirmed'],
@@ -56,8 +67,9 @@ class UpdateUserRequest extends FormRequest
     public function messages(): array
     {
         return array_merge($this->employeeIdMessages(), [
-            'email.unique'       => 'This email address is already in use.',
-            'password.confirmed' => 'Password confirmation does not match.',
+            'email.unique'               => 'This email address is already in use.',
+            'custodian_unit_id.required' => 'A custodian unit must be selected for this custodian role.',
+            'password.confirmed'         => 'Password confirmation does not match.',
         ]);
     }
 }

@@ -61,7 +61,7 @@ Route::middleware('auth')->group(function () {
 
     // ─── Detail/Show routes (still separate pages) ───
     Route::get('/facilities/{facility}', [FacilityController::class, 'show'])->middleware('permission:facility.view');
-    Route::get('/equipment/create', [EquipmentController::class, 'create'])->middleware('permission:equipment.manage');
+    Route::get('/equipment/create', [EquipmentController::class, 'create'])->middleware('permission:equipment.manage,inventory.manage_own');
     Route::get('/equipment/returns', [EquipmentReturnController::class, 'index'])->middleware('permission:equipment.approve');
     Route::get('/equipment/{equipment}', [EquipmentController::class, 'show'])->middleware('permission:equipment.view');
     Route::get('/events/my', [EventController::class, 'myEvents'])->middleware('permission:event.view');
@@ -96,11 +96,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/equipment-requests/{equipmentRequest}/confirm-return', [EquipmentReturnController::class, 'confirmReturn'])->middleware('permission:equipment.approve');
     Route::post('/equipment-requests/{equipmentRequest}/send-reminder', [EquipmentReturnController::class, 'sendReminder'])->middleware('permission:equipment.approve');
 
-    // ─── Equipment Inventory CRUD (Admin) ───
-    Route::post('/equipment', [EquipmentController::class, 'store'])->middleware('permission:equipment.manage');
-    Route::get('/equipment/{equipment}/edit', [EquipmentController::class, 'edit'])->middleware('permission:equipment.manage');
-    Route::put('/equipment/{equipment}', [EquipmentController::class, 'update'])->middleware('permission:equipment.manage');
-    Route::delete('/equipment/{equipment}', [EquipmentController::class, 'destroy'])->middleware('permission:equipment.manage');
+    // ─── Equipment Inventory CRUD (Admin / Custodians) ───
+    Route::post('/equipment', [EquipmentController::class, 'store'])->middleware('permission:equipment.manage,inventory.manage_own');
+    Route::get('/equipment/{equipment}/edit', [EquipmentController::class, 'edit'])->middleware('permission:equipment.manage,inventory.manage_own');
+    Route::put('/equipment/{equipment}', [EquipmentController::class, 'update'])->middleware('permission:equipment.manage,inventory.manage_own');
+    Route::delete('/equipment/{equipment}', [EquipmentController::class, 'destroy'])->middleware('permission:equipment.manage,inventory.manage_own');
 
     Route::post('/events', [EventController::class, 'store'])->middleware('permission:event.create');
     Route::post('/events/{event}/register', [EventController::class, 'register'])->middleware('permission:event.view');

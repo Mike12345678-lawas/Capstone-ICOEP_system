@@ -21,6 +21,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'equipment.borrow', 'description' => 'Submit equipment borrow requests'],
             ['name' => 'equipment.manage', 'description' => 'Manage equipment inventory (add/edit/delete)'],
             ['name' => 'equipment.approve','description' => 'Approve/reject equipment requests (Admin only)'],
+            ['name' => 'inventory.manage_own', 'description' => 'Manage own unit equipment inventory'],
             // Events
             ['name' => 'event.view',       'description' => 'View events list'],
             ['name' => 'event.create',     'description' => 'Create new events'],
@@ -46,6 +47,13 @@ class PermissionSeeder extends Seeder
         }
 
         // Assign permissions to roles
+        $unitPermissions = [
+            'facility.view', 'facility.reserve',
+            'equipment.view', 'equipment.borrow',
+            'event.view', 'announcement.view',
+            'inventory.manage_own',
+        ];
+
         $rolePermissions = [
             'Administrator' => Permission::pluck('name')->toArray(), // All permissions
             'Staff' => [
@@ -67,6 +75,10 @@ class PermissionSeeder extends Seeder
                 'event.view',
                 'announcement.view',
             ],
+            'Registrar'         => $unitPermissions,
+            'Librarian'         => $unitPermissions,
+            'Maintenance Staff' => $unitPermissions,
+            'ComLab Staff'      => $unitPermissions,
         ];
 
         foreach ($rolePermissions as $roleName => $permNames) {

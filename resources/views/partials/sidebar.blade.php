@@ -121,7 +121,7 @@
             </div>
         </div>
 
-        @if(auth()->user()->hasPermission('facility.approve') || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('user.view'))
+        @if(auth()->user()->hasPermission('facility.approve') || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('user.view') || auth()->user()->hasPermission('equipment.manage') || auth()->user()->hasPermission('inventory.manage_own'))
         <div class="nav-section">
             <div class="nav-section-title">
                 <span>Management</span>
@@ -166,7 +166,18 @@
                 </a>
                 @endif
 
-                @if(auth()->user()->hasPermission('equipment.manage'))
+                @if(auth()->user()->custodian_unit_id || auth()->user()->hasPermission('inventory.manage_own') || auth()->user()->hasRole('Administrator'))
+                <a href="{{ url('/dashboard?section=pickup-queue') }}" class="nav-link {{ $currentSection === 'pickup-queue' ? 'active' : '' }}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                    <span>Pickup Queue</span>
+                </a>
+                @endif
+
+                @if(auth()->user()->hasPermission('equipment.manage') || auth()->user()->hasPermission('inventory.manage_own'))
                 <a href="{{ url('/dashboard?section=inventory') }}" class="nav-link {{ $currentSection === 'inventory' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>

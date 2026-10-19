@@ -33,6 +33,9 @@
     @case('inventory')
         @include('dashboard.partials._inventory')
         @break
+    @case('pickup-queue')
+        @include('dashboard.partials._pickup_queue')
+        @break
     @case('manage-bookings')
         @include('dashboard.partials._manage_bookings')
         @break

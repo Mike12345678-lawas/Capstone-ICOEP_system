@@ -44,13 +44,14 @@
         <div class="table-responsive manage-table-responsive">
             <table class="data-table mobile-cards">
                 <thead>
-                    <tr><th>Name</th><th>Category</th><th>Available / Total</th><th>Status</th><th>Action</th></tr>
+                    <tr><th>Name</th><th>Category</th><th>Unit</th><th>Available / Total</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                 @forelse($equipment as $item)
                     <tr>
                         <td data-label="Name" style="font-weight: 600;">{{ $item->name }}</td>
                         <td data-label="Category"><span class="badge badge-general">{{ $item->category }}</span></td>
+                        <td data-label="Unit"><span class="badge badge-general">{{ $item->custodianUnit?->name ?? 'Unassigned' }}</span></td>
                         <td data-label="Available / Total">{{ $item->available_quantity }} / {{ $item->quantity }}</td>
                         <td data-label="Status">
                             <span class="badge {{ $item->available_quantity > 0 ? 'badge-success' : 'badge-error' }}">
@@ -60,7 +61,7 @@
                         <td data-label="Action" class="card-actions-cell"><a href="{{ url('/equipment/' . $item->id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">View Details</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center text-muted" style="padding: 2rem;">No equipment found.</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted" style="padding: 2rem;">No equipment found.</td></tr>
                 @endforelse
                 </tbody>
             </table>
