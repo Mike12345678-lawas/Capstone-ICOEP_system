@@ -48,6 +48,18 @@ class EventNotificationService
                 $prefix = "A new event for Students only";
                 break;
 
+            case Event::AUDIENCE_BSIT:
+            case Event::AUDIENCE_BSHM:
+            case Event::AUDIENCE_BSBA_FM:
+            case Event::AUDIENCE_BSED:
+            case Event::AUDIENCE_BEED:
+                $deptCode = Event::DEPARTMENT_AUDIENCES[$audience];
+                $query->whereHas('department', fn($q) => $q->where('code', $deptCode));
+                $deptLabel = Event::AUDIENCES[$audience] ?? strtoupper($deptCode);
+                $title = "📣 New {$deptLabel} Event: {$event->title}";
+                $prefix = "A new event for {$deptLabel}";
+                break;
+
             case Event::AUDIENCE_ALL:
             default:
                 // All active users

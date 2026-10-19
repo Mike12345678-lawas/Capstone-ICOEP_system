@@ -41,10 +41,19 @@
                 <div class="form-group">
                     <label class="form-label" for="target_audience">Target Audience *</label>
                     <select id="target_audience" name="target_audience" class="form-control" required>
-                        <option value="all" {{ old('target_audience', 'all') === 'all' ? 'selected' : '' }}>All Campus (Everyone)</option>
-                        <option value="faculty" {{ old('target_audience') === 'faculty' ? 'selected' : '' }}>Faculty Only</option>
-                        <option value="staff" {{ old('target_audience') === 'staff' ? 'selected' : '' }}>Staff (Non-Teaching) Only</option>
-                        <option value="student" {{ old('target_audience') === 'student' ? 'selected' : '' }}>Students Only</option>
+                        <optgroup label="Campus-Wide & Roles">
+                            <option value="all" {{ old('target_audience', 'all') === 'all' ? 'selected' : '' }}>All Campus (Everyone)</option>
+                            <option value="faculty" {{ old('target_audience') === 'faculty' ? 'selected' : '' }}>Faculty Only</option>
+                            <option value="staff" {{ old('target_audience') === 'staff' ? 'selected' : '' }}>Staff (Non-Teaching) Only</option>
+                            <option value="student" {{ old('target_audience') === 'student' ? 'selected' : '' }}>Students Only</option>
+                        </optgroup>
+                        <optgroup label="Academic Programs / Departments">
+                            <option value="bsit" {{ old('target_audience') === 'bsit' ? 'selected' : '' }}>BSIT Only</option>
+                            <option value="bshm" {{ old('target_audience') === 'bshm' ? 'selected' : '' }}>BSHM Only</option>
+                            <option value="bsba-fm" {{ old('target_audience') === 'bsba-fm' ? 'selected' : '' }}>BSBA-FM Only</option>
+                            <option value="bsed" {{ old('target_audience') === 'bsed' ? 'selected' : '' }}>BSED Only</option>
+                            <option value="beed" {{ old('target_audience') === 'beed' ? 'selected' : '' }}>BEED Only</option>
+                        </optgroup>
                     </select>
                     <div class="form-hint">Notifies and shows only to the selected audience.</div>
                 </div>

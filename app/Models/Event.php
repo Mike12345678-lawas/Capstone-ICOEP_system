@@ -15,6 +15,11 @@ class Event extends Model
     public const AUDIENCE_FACULTY = 'faculty';
     public const AUDIENCE_STAFF = 'staff';
     public const AUDIENCE_STUDENT = 'student';
+    public const AUDIENCE_BSIT = 'bsit';
+    public const AUDIENCE_BSHM = 'bshm';
+    public const AUDIENCE_BSBA_FM = 'bsba-fm';
+    public const AUDIENCE_BSED = 'bsed';
+    public const AUDIENCE_BEED = 'beed';
 
     /**
      * Non-teaching staff roles.
@@ -27,11 +32,27 @@ class Event extends Model
         'ComLab Staff',
     ];
 
+    /**
+     * Map of department-specific audiences to canonical Department code.
+     */
+    public const DEPARTMENT_AUDIENCES = [
+        self::AUDIENCE_BSIT    => 'BSIT',
+        self::AUDIENCE_BSHM    => 'BSHM',
+        self::AUDIENCE_BSBA_FM => 'BSBA-FM',
+        self::AUDIENCE_BSED    => 'BSEd',
+        self::AUDIENCE_BEED    => 'BEEd',
+    ];
+
     public const AUDIENCES = [
         self::AUDIENCE_ALL     => 'All Campus',
         self::AUDIENCE_FACULTY => 'Faculty Only',
         self::AUDIENCE_STAFF   => 'Staff (Non-Teaching) Only',
         self::AUDIENCE_STUDENT => 'Students Only',
+        self::AUDIENCE_BSIT    => 'BSIT Only',
+        self::AUDIENCE_BSHM    => 'BSHM Only',
+        self::AUDIENCE_BSBA_FM => 'BSBA-FM Only',
+        self::AUDIENCE_BSED    => 'BSED Only',
+        self::AUDIENCE_BEED    => 'BEED Only',
     ];
 
     protected $fillable = [
@@ -96,6 +117,12 @@ class Event extends Model
 
         $roleName = $user->role?->name;
 
+        if (array_key_exists($audience, self::DEPARTMENT_AUDIENCES)) {
+            $targetCode = strtoupper(self::DEPARTMENT_AUDIENCES[$audience]);
+            $userCode = strtoupper($user->department?->code ?? '');
+            return $userCode !== '' && $userCode === $targetCode;
+        }
+
         return match ($audience) {
             self::AUDIENCE_FACULTY => $roleName === 'Faculty',
             self::AUDIENCE_STAFF   => in_array($roleName, self::STAFF_ROLES, true),
@@ -120,6 +147,12 @@ class Event extends Model
         }
 
         $roleName = $user->role?->name;
+
+        if (array_key_exists($audience, self::DEPARTMENT_AUDIENCES)) {
+            $targetCode = strtoupper(self::DEPARTMENT_AUDIENCES[$audience]);
+            $userCode = strtoupper($user->department?->code ?? '');
+            return $userCode !== '' && $userCode === $targetCode;
+        }
 
         return match ($audience) {
             self::AUDIENCE_FACULTY => $roleName === 'Faculty',
@@ -156,6 +189,16 @@ class Event extends Model
             $allowedAudiences[] = self::AUDIENCE_STAFF;
         } elseif ($roleName === 'Student') {
             $allowedAudiences[] = self::AUDIENCE_STUDENT;
+        }
+
+        if ($user->department) {
+            $userDeptCode = strtoupper($user->department->code);
+            foreach (self::DEPARTMENT_AUDIENCES as $audKey => $deptCode) {
+                if (strtoupper($deptCode) === $userDeptCode) {
+                    $allowedAudiences[] = $audKey;
+                    break;
+                }
+            }
         }
 
         return $query->where(function ($q) use ($allowedAudiences, $user) {

@@ -99,7 +99,7 @@ class EventController extends Controller
             'objectives'       => 'required|string|min:10',
             'description'      => 'nullable|string',
             'event_type'       => 'required|in:academic,cultural,sports,spiritual,other',
-            'target_audience'  => 'nullable|string|in:all,faculty,staff,student',
+            'target_audience'  => 'nullable|string|in:' . implode(',', array_keys(Event::AUDIENCES)),
             'event_date'       => 'required|date|after_or_equal:today',
             'time_start'       => 'required|date_format:H:i',
             'time_end'         => 'required|date_format:H:i|after:time_start',

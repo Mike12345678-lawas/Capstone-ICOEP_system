@@ -364,4 +364,135 @@ class EventTargetAudienceTest extends TestCase
         $this->assertStringContainsString('Faculty Seminar Calendar Test', $facultyTitles);
         $this->assertStringNotContainsString('Student Festival Calendar Test', $facultyTitles);
     }
+
+    public function test_department_audience_event_creation_notifies_only_matching_department(): void
+    {
+        $bsitDept = Department::where('code', 'BSIT')->first();
+        $bshmDept = Department::where('code', 'BSHM')->first();
+
+        $bsitStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bsitDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'IT-001',
+            'email'         => 'it.student@icoep.test',
+        ]);
+
+        $bshmStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bshmDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'HM-001',
+            'email'         => 'hm.student@icoep.test',
+        ]);
+
+        $response = $this->actingAs($this->admin)->post('/events', [
+            'title'            => 'BSIT Hackathon 2026',
+            'objectives'       => 'Foster coding innovation and collaborative problem solving for IT students.',
+            'event_type'       => 'academic',
+            'target_audience'  => 'bsit',
+            'event_date'       => now()->addDays(5)->format('Y-m-d'),
+            'time_start'       => '08:00',
+            'time_end'         => '17:00',
+            'venue'            => 'Computer Laboratory 1',
+            'max_participants' => 60,
+        ]);
+
+        $event = Event::where('title', 'BSIT Hackathon 2026')->first();
+        $this->assertNotNull($event);
+        $this->assertSame('bsit', $event->target_audience);
+        $this->assertSame('BSIT Only', $event->target_audience_label);
+        $response->assertRedirect('/events/' . $event->id);
+
+        // BSIT student received notification
+        $this->assertTrue(
+            Notification::where('user_id', $bsitStudent->id)
+                ->where('title', 'like', '%BSIT%')
+                ->where('link', '/events/' . $event->id)
+                ->exists()
+        );
+
+        // BSHM student must NOT receive notification
+        $this->assertFalse(Notification::where('user_id', $bshmStudent->id)->exists());
+
+        // Admin creator must NOT receive self notification
+        $this->assertFalse(Notification::where('user_id', $this->admin->id)->exists());
+    }
+
+    public function test_department_audience_scoping_dashboard_and_direct_access(): void
+    {
+        $bsitDept = Department::where('code', 'BSIT')->first();
+        $bshmDept = Department::where('code', 'BSHM')->first();
+
+        $bsitStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bsitDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'IT-002',
+            'email'         => 'it2@icoep.test',
+        ]);
+
+        $bshmStudent = User::factory()->create([
+            'role_id'       => $this->studentRole->id,
+            'department_id' => $bshmDept->id,
+            'status'        => 'active',
+            'employee_id'   => 'HM-002',
+            'email'         => 'hm2@icoep.test',
+        ]);
+
+        $bsitEvent = Event::create([
+            'title'            => 'BSIT Tech Symposium',
+            'objectives'       => 'Emerging trends in cloud architecture and machine learning.',
+            'event_type'       => 'academic',
+            'target_audience'  => 'bsit',
+            'event_date'       => now()->addDays(4)->format('Y-m-d'),
+            'time_start'       => '13:00',
+            'time_end'         => '16:00',
+            'organizer_id'     => $this->admin->id,
+            'status'           => 'upcoming',
+        ]);
+
+        $bshmEvent = Event::create([
+            'title'            => 'BSHM Culinary Expo',
+            'objectives'       => 'Masterclass in food presentation and banquet service operations.',
+            'event_type'       => 'cultural',
+            'target_audience'  => 'bshm',
+            'event_date'       => now()->addDays(4)->format('Y-m-d'),
+            'time_start'       => '10:00',
+            'time_end'         => '14:00',
+            'organizer_id'     => $this->admin->id,
+            'status'           => 'upcoming',
+        ]);
+
+        // BSIT student dashboard view
+        $itResp = $this->actingAs($bsitStudent)->get('/dashboard?section=events');
+        $itResp->assertOk();
+        $itResp->assertSee('BSIT Tech Symposium');
+        $itResp->assertDontSee('BSHM Culinary Expo');
+
+        // BSHM student dashboard view
+        $hmResp = $this->actingAs($bshmStudent)->get('/dashboard?section=events');
+        $hmResp->assertOk();
+        $hmResp->assertSee('BSHM Culinary Expo');
+        $hmResp->assertDontSee('BSIT Tech Symposium');
+
+        // Direct show route: BSIT student can view BSIT event
+        $this->actingAs($bsitStudent)->get('/events/' . $bsitEvent->id)
+            ->assertOk()
+            ->assertSee('BSIT Only');
+
+        // Direct show route: BSHM student trying to view BSIT event gets 403 Forbidden
+        $this->actingAs($bshmStudent)->get('/events/' . $bsitEvent->id)
+            ->assertForbidden();
+
+        // Registration: BSIT student can register for BSIT event
+        $this->actingAs($bsitStudent)->post('/events/' . $bsitEvent->id . '/register')
+            ->assertSessionHas('success');
+        $this->assertTrue(EventRegistration::where('event_id', $bsitEvent->id)->where('user_id', $bsitStudent->id)->exists());
+
+        // Registration: BSHM student blocked from registering for BSIT event
+        $this->actingAs($bshmStudent)->post('/events/' . $bsitEvent->id . '/register')
+            ->assertSessionHas('error');
+        $this->assertFalse(EventRegistration::where('event_id', $bsitEvent->id)->where('user_id', $bshmStudent->id)->exists());
+    }
 }

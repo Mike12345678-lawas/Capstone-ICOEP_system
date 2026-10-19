@@ -61,6 +61,8 @@
                                     <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3);">Staff Only</span>
                                 @elseif($event->target_audience === 'student')
                                     <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3);">Students Only</span>
+                                @elseif(in_array($event->target_audience, ['bsit', 'bshm', 'bsba-fm', 'bsed', 'beed']))
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #047857; border: 1px solid rgba(16, 185, 129, 0.3);">{{ $event->target_audience_label }}</span>
                                 @else
                                     <span class="badge badge-general">All Campus</span>
                                 @endif
