@@ -23,6 +23,9 @@ class MailTestController extends Controller
 
         $smtpPassword = (string) config('mail.mailers.smtp.password');
 
+        $relayUrl = env('GMAIL_RELAY_URL');
+        $effectiveMailer = $relayUrl ? 'gmail-relay' : config('mail.default');
+
         return view('admin.mail_test', [
             'pageTitle'    => 'Email Diagnostics & Testing',
             'breadcrumb'   => [
@@ -30,7 +33,8 @@ class MailTestController extends Controller
                 ['label' => 'Email Diagnostics'],
             ],
             'currentUser'  => $user,
-            'activeMailer' => config('mail.default'),
+            'activeMailer' => $effectiveMailer,
+            'relayUrlSet'  => !empty($relayUrl),
             'resendKeySet' => !empty($resendKey),
             'resendMasked' => $resendMasked,
             'fromAddress'  => config('mail.from.address'),

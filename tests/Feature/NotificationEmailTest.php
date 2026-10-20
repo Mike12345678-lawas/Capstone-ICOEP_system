@@ -269,4 +269,33 @@ class NotificationEmailTest extends TestCase
 
         $postResponse->assertSessionHas('mail_success');
     }
+
+    public function test_email_notification_service_dispatches_via_google_relay(): void
+    {
+        $fakeUrl = 'https://script.google.com/macros/s/FAKE_RELAY_KEY/exec';
+
+        \Illuminate\Support\Facades\Http::fake([
+            $fakeUrl => \Illuminate\Support\Facades\Http::response([
+                'success' => true,
+            ], 200),
+        ]);
+
+        putenv("GMAIL_RELAY_URL={$fakeUrl}");
+        $_ENV['GMAIL_RELAY_URL'] = $fakeUrl;
+
+        $notification = Notification::send(
+            $this->user->id,
+            'Relay Test Alert',
+            'Testing Google Apps Script Relay'
+        );
+
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) use ($fakeUrl) {
+            return $request->url() === $fakeUrl
+                && str_contains($request['subject'], 'Relay Test Alert')
+                && $request['to'] === 'juan.delacruz@gmail.com';
+        });
+
+        putenv('GMAIL_RELAY_URL');
+        unset($_ENV['GMAIL_RELAY_URL']);
+    }
 }

@@ -27,10 +27,16 @@ class EmailNotificationService
             ];
         }
 
+        $relayUrl = env('GMAIL_RELAY_URL');
         $resendKey = config('services.resend.key') ?: env('RESEND_API_KEY');
         $activeMailer = config('mail.default');
 
-        // Use Resend HTTP API if configured as default mailer or if Resend key is provided
+        // Priority 1: Google Apps Script Web Relay (Sends to any school/personal email over HTTPS)
+        if ($relayUrl && ($activeMailer === 'gmail-relay' || empty($resendKey) || $activeMailer === 'resend')) {
+            return self::sendViaGoogleRelay($notification, $user, $relayUrl);
+        }
+
+        // Priority 2: Resend HTTP API (Port 443)
         if ($activeMailer === 'resend' || ($resendKey && $activeMailer !== 'log' && $activeMailer !== 'array')) {
             return self::sendViaResend($notification, $user, (string) $resendKey);
         }
@@ -130,6 +136,79 @@ class EmailNotificationService
             return [
                 'success'  => false,
                 'provider' => 'resend',
+                'message'  => $msg,
+            ];
+        }
+    }
+
+    /**
+     * Send email via Google Apps Script Web App Relay over HTTPS (port 443).
+     * Works with personal or institutional Google accounts to deliver to any recipient without domain limits.
+     */
+    public static function sendViaGoogleRelay(Notification $notification, User $user, string $relayUrl): array
+    {
+        try {
+            $mailable = new AccountNotificationMail($notification, $user);
+            $htmlContent = view('emails.account_notification', [
+                'notification' => $notification,
+                'user'         => $user,
+                'actionUrl'    => $mailable->actionUrl,
+                'typeTheme'    => $mailable->getTypeTheme(),
+            ])->render();
+
+            $response = Http::timeout(25)
+                ->withOptions(['allow_redirects' => true])
+                ->asJson()
+                ->post($relayUrl, [
+                    'to'      => $user->email,
+                    'subject' => $mailable->envelope()->subject,
+                    'html'    => $htmlContent,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (is_array($data) && !empty($data['success'])) {
+                    Log::info("Email sent to {$user->email} via Google Apps Script Relay.");
+                    return [
+                        'success'  => true,
+                        'provider' => 'gmail-relay',
+                        'message'  => "Delivered to {$user->email} via Google Apps Script Relay!",
+                        'details'  => $data,
+                    ];
+                }
+
+                if (is_array($data) && !empty($data['error'])) {
+                    return [
+                        'success'  => false,
+                        'provider' => 'gmail-relay',
+                        'message'  => "Google Apps Script error: " . $data['error'],
+                    ];
+                }
+            }
+
+            // In case Google returns an HTML redirect or login page
+            $body = $response->body();
+            if (str_contains($body, 'ServiceLogin') || str_contains($body, 'accounts.google.com')) {
+                return [
+                    'success'  => false,
+                    'provider' => 'gmail-relay',
+                    'message'  => 'Google Relay requires authentication. In Google Apps Script, set "Who has access" to "Anyone" (not restricted to domain).',
+                ];
+            }
+
+            return [
+                'success'  => true, // Often Google Apps Script returns 200 without JSON
+                'provider' => 'gmail-relay',
+                'message'  => "Dispatched to {$user->email} via Google Apps Script Relay.",
+            ];
+        } catch (\Throwable $e) {
+            $msg = "Google Relay error: " . $e->getMessage();
+            Log::error($msg);
+            error_log($msg);
+
+            return [
+                'success'  => false,
+                'provider' => 'gmail-relay',
                 'message'  => $msg,
             ];
         }

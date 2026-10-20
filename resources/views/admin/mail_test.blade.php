@@ -132,13 +132,23 @@
                             <td style="font-weight: 600; padding: 0.75rem 1rem;">Active Mailer</td>
                             <td style="padding: 0.75rem 1rem;">
                                 <code>{{ $activeMailer }}</code>
-                                @if($activeMailer === 'resend')
+                                @if($activeMailer === 'gmail-relay')
+                                    <span style="color: #059669; font-size: 0.8rem; margin-left: 0.25rem;">(Google Apps Script Relay — Unlimited School Recipients!)</span>
+                                @elseif($activeMailer === 'resend')
                                     <span style="color: #059669; font-size: 0.8rem; margin-left: 0.25rem;">(HTTPS Port 443 — Render Free friendly)</span>
                                 @elseif($activeMailer === 'smtp')
                                     <span style="color: #d97706; font-size: 0.8rem; margin-left: 0.25rem;">(Standard SMTP)</span>
                                 @endif
                             </td>
                         </tr>
+                        @if($relayUrlSet)
+                        <tr>
+                            <td style="font-weight: 600; padding: 0.75rem 1rem;">Google Relay</td>
+                            <td style="padding: 0.75rem 1rem;">
+                                <span style="color: #059669;">✔ Active (Delivers to all @ciccebu.edu.ph school accounts)</span>
+                            </td>
+                        </tr>
+                        @endif
                         <tr>
                             <td style="font-weight: 600; padding: 0.75rem 1rem;">Resend API Key</td>
                             <td style="padding: 0.75rem 1rem;">

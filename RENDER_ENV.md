@@ -19,18 +19,21 @@ Replace every `<placeholder>` with your real value **in Render only** — never 
 | `LOG_CHANNEL` | `stderr` |
 | `SESSION_DRIVER` | `file` |
 | `CACHE_STORE` | `file` |
-| `MAIL_MAILER` | `resend` (Recommended for Render Free) |
-| `RESEND_API_KEY` | `re_...` (From free account at https://resend.com) |
-| `MAIL_FROM_ADDRESS` | `onboarding@resend.dev` (or your verified domain email) |
+| `GMAIL_RELAY_URL` | `https://script.google.com/macros/s/.../exec` (Recommended: sends to ANY @ciccebu.edu.ph school account!) |
+| `MAIL_MAILER` | `resend` (Alternative if using Resend) |
+| `RESEND_API_KEY` | `re_...` (Alternative if using Resend) |
+| `MAIL_FROM_ADDRESS` | `onboarding@resend.dev` |
 | `MAIL_FROM_NAME` | `ICOEP System` |
 
 > ### 💡 Email on Render Free Tier
-> Render's Free tier blocks outbound SMTP ports (25, 465, 587), so standard Gmail SMTP will time out. 
-> Instead, **Resend** delivers emails over standard HTTPS (Port 443), which Render never blocks.
-> 1. Sign up for a free account at [resend.com](https://resend.com) (3,000 free emails/month).
-> 2. Create an API Key (starts with `re_...`).
-> 3. Add `MAIL_MAILER=resend`, `RESEND_API_KEY=re_...`, `MAIL_FROM_ADDRESS=onboarding@resend.dev`, and `MAIL_FROM_NAME=ICOEP System` in Render Dashboard → Environment.
-> 4. Test live delivery in your browser by visiting `/admin/mail-test` on your live site!
+> Render's Free tier blocks outbound SMTP ports (25, 465, 587).
+> You have two working HTTPS (Port 443) options:
+> 
+> **Option 1 (Best for School Accounts — Google Apps Script Relay):**
+> Add `GMAIL_RELAY_URL` with your public Google Apps Script Web App URL. It sends directly via Google to **any student/faculty @ciccebu.edu.ph school account** with zero domain restrictions!
+>
+> **Option 2 (Resend):**
+> Add `RESEND_API_KEY` and set `MAIL_MAILER=resend`. Note: Resend's free sandbox (`onboarding@resend.dev`) only sends to the single email registered on that Resend account.
 
 > This project uses Laravel 12, so `CACHE_DRIVER` is **not** needed (`CACHE_STORE` replaced it in Laravel 11+).
 
