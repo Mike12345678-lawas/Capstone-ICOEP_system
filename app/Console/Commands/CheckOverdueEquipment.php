@@ -68,31 +68,9 @@ class CheckOverdueEquipment extends Command
                         $request->expected_return_date->format('M d, Y') .
                         " ({$daysOverdue} day(s) overdue). Please return it immediately.",
                     'error',
-                    '/equipment/' . $equipment->id,
-                    sendEmail: false
+                    '/equipment/' . $equipment->id
                 );
-            }
-
-            // ─── Email Notification ──────────────────────────────────────
-            if ($borrower->email && filter_var($borrower->email, FILTER_VALIDATE_EMAIL)) {
-                try {
-                    Mail::send(
-                        'emails.overdue_equipment',
-                        [
-                            'borrower'    => $borrower,
-                            'equipment'   => $equipment,
-                            'request'     => $request,
-                            'daysOverdue' => $daysOverdue,
-                        ],
-                        function ($mail) use ($borrower, $equipment) {
-                            $mail->to($borrower->email, $borrower->full_name)
-                                 ->subject("Overdue Equipment: {$equipment->name} — Please Return Immediately");
-                        }
-                    );
-                    $this->line("     ✉  Email sent to {$borrower->email}");
-                } catch (\Exception $e) {
-                    $this->warn("     ✉  Email failed for {$borrower->email}: {$e->getMessage()}");
-                }
+                $this->line("     ✉  Notification & email dispatched to {$borrower->email}");
             }
 
             // ─── Audit Log ───────────────────────────────────────────────

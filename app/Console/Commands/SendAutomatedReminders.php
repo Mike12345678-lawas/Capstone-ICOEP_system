@@ -57,19 +57,9 @@ class SendAutomatedReminders extends Command
                     'Upcoming Reservation Reminder',
                     "Just a reminder that your reservation for \"{$facility->name}\" is scheduled for tomorrow at {$formattedTime}.",
                     'info',
-                    $notificationLink,
-                    sendEmail: false
+                    $notificationLink
                 );
-            }
-
-            // Email Notification
-            if ($user->email && filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
-                try {
-                    Mail::to($user->email)->send(new UpcomingReservationReminder($reservation));
-                    $this->line("     ✉  Email sent to {$user->email}");
-                } catch (\Exception $e) {
-                    $this->warn("     ✉  Email failed for {$user->email}: {$e->getMessage()}");
-                }
+                $this->line("     ✉  Notification & email dispatched to {$user->email}");
             }
 
             AuditLog::log('UPCOMING_REMINDER_SENT', 'facility_reservations', $reservation->id);

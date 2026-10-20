@@ -458,28 +458,8 @@ class EquipmentReturnController extends Controller
                 $equipmentRequest->expected_return_date->format('M d, Y') .
                 " ({$daysOverdue} day(s) overdue). Please return it immediately.",
             'error',
-            '/equipment/' . $equipment->id,
-            sendEmail: false
+            '/equipment/' . $equipment->id
         );
-
-        // Send email using existing overdue template if email available
-        try {
-            Mail::send(
-                'emails.overdue_equipment',
-                [
-                    'borrower'    => $borrower,
-                    'equipment'   => $equipment,
-                    'request'     => $equipmentRequest,
-                    'daysOverdue' => $daysOverdue,
-                ],
-                function ($message) use ($borrower, $equipment) {
-                    $message->to($borrower->email, $borrower->full_name)
-                            ->subject("Overdue Equipment: {$equipment->name} — Please Return Immediately");
-                }
-            );
-        } catch (\Throwable $e) {
-            // Log or ignore mail transport issues in local dev
-        }
 
         AuditLog::log('OVERDUE_ALERT_SENT', 'equipment_requests', $equipmentRequest->id);
 

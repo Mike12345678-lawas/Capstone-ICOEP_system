@@ -4,15 +4,19 @@ namespace Tests\Feature;
 
 use App\Mail\AccountNotificationMail;
 use App\Models\Department;
+use App\Models\Equipment;
+use App\Models\EquipmentRequest;
 use App\Models\Event;
 use App\Models\Notification;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\EventNotificationService;
+use Carbon\Carbon;
 use Database\Seeders\DepartmentSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -276,5 +280,91 @@ class NotificationEmailTest extends TestCase
 
         putenv('GMAIL_RELAY_URL');
         unset($_ENV['GMAIL_RELAY_URL']);
+    }
+
+    public function test_overdue_equipment_reminder_action_sends_email_to_borrower(): void
+    {
+        Mail::fake();
+
+        $equipment = Equipment::create([
+            'name'               => 'Sony Alpha Camera',
+            'category'           => 'Electronics',
+            'quantity'           => 5,
+            'available_quantity' => 4,
+            'status'             => 'available',
+        ]);
+
+        $borrowedReq = EquipmentRequest::create([
+            'equipment_id'         => $equipment->id,
+            'user_id'              => $this->user->id,
+            'quantity'             => 1,
+            'purpose'              => 'Campus Event Coverage',
+            'date_needed'          => '2026-10-01',
+            'expected_return_date' => '2026-10-05',
+            'status'               => 'borrowed',
+        ]);
+
+        Carbon::setTestNow('2026-10-08 10:00:00'); // 3 days overdue
+
+        $response = $this->actingAs($this->admin)->post("/equipment-requests/{$borrowedReq->id}/send-reminder");
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->user->id,
+            'title'   => 'Overdue Equipment Alert',
+            'type'    => 'error',
+        ]);
+
+        Mail::assertSent(AccountNotificationMail::class, function ($mail) {
+            return $mail->hasTo('juan.delacruz@gmail.com')
+                && $mail->notification->title === 'Overdue Equipment Alert'
+                && $mail->notification->type === 'error'
+                && str_contains($mail->notification->message, 'Sony Alpha Camera')
+                && str_contains($mail->notification->message, 'overdue');
+        });
+
+        Carbon::setTestNow();
+    }
+
+    public function test_overdue_equipment_command_sends_email_to_borrower(): void
+    {
+        Mail::fake();
+
+        $equipment = Equipment::create([
+            'name'               => 'Dell Latitude Laptop',
+            'category'           => 'Computers',
+            'quantity'           => 3,
+            'available_quantity' => 2,
+            'status'             => 'available',
+        ]);
+
+        $borrowedReq = EquipmentRequest::create([
+            'equipment_id'         => $equipment->id,
+            'user_id'              => $this->user->id,
+            'quantity'             => 1,
+            'purpose'              => 'Programming Exam',
+            'date_needed'          => '2026-10-01',
+            'expected_return_date' => '2026-10-04',
+            'status'               => 'borrowed',
+        ]);
+
+        Carbon::setTestNow('2026-10-06 09:00:00'); // 2 days overdue
+
+        Artisan::call('equipment:check-overdue');
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->user->id,
+            'title'   => 'Overdue Equipment Alert',
+            'type'    => 'error',
+        ]);
+
+        Mail::assertSent(AccountNotificationMail::class, function ($mail) {
+            return $mail->hasTo('juan.delacruz@gmail.com')
+                && $mail->notification->title === 'Overdue Equipment Alert'
+                && $mail->notification->type === 'error'
+                && str_contains($mail->notification->message, 'Dell Latitude Laptop');
+        });
+
+        Carbon::setTestNow();
     }
 }

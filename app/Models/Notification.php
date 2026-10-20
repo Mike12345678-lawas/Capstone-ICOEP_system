@@ -33,7 +33,11 @@ class Notification extends Model
     {
         static::created(function (Notification $notification) {
             if (!$notification->skipEmailNotification && static::$shouldSendEmails) {
-                $notification->sendEmailNotification();
+                if (function_exists('defer') && !app()->runningUnitTests()) {
+                    defer(fn() => $notification->sendEmailNotification());
+                } else {
+                    $notification->sendEmailNotification();
+                }
             }
         });
     }
