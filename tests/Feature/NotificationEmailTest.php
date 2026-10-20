@@ -219,4 +219,54 @@ class NotificationEmailTest extends TestCase
             $this->assertNotEmpty($mailable->getTypeTheme()['badge']);
         }
     }
+
+    public function test_email_notification_service_dispatches_via_resend_http_api(): void
+    {
+        \Illuminate\Support\Facades\Http::fake([
+            'https://api.resend.com/emails' => \Illuminate\Support\Facades\Http::response([
+                'id' => 'resend_msg_test_123',
+            ], 200),
+        ]);
+
+        config(['mail.default' => 'resend']);
+        config(['services.resend.key' => 're_test_key_12345']);
+
+        $notification = Notification::send(
+            $this->user->id,
+            'Resend Test Alert',
+            'Testing Resend HTTP API dispatching.'
+        );
+
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.resend.com/emails'
+                && $request->hasHeader('Authorization', 'Bearer re_test_key_12345')
+                && str_contains($request['subject'], 'Resend Test Alert')
+                && in_array('juan.delacruz@gmail.com', $request['to']);
+        });
+    }
+
+    public function test_admin_can_access_mail_test_page_and_send_test(): void
+    {
+        \Illuminate\Support\Facades\Http::fake([
+            'https://api.resend.com/emails' => \Illuminate\Support\Facades\Http::response([
+                'id' => 'resend_diag_456',
+            ], 200),
+        ]);
+
+        config(['mail.default' => 'resend']);
+        config(['services.resend.key' => 're_test_key_12345']);
+
+        $response = $this->actingAs($this->admin)->get('/admin/mail-test');
+        $response->assertStatus(200);
+        $response->assertSee('Email Diagnostics & Live Testing');
+
+        $postResponse = $this->actingAs($this->admin)->post('/admin/mail-test', [
+            'email'   => 'recipient@example.com',
+            'title'   => 'Custom Web Test',
+            'message' => 'Testing from web diagnostic form',
+            'type'    => 'success',
+        ]);
+
+        $postResponse->assertSessionHas('mail_success');
+    }
 }

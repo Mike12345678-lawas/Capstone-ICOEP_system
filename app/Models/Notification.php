@@ -84,14 +84,13 @@ class Notification extends Model
         try {
             $user = $this->relationLoaded('user') ? $this->user : User::find($this->user_id);
 
-            if (!$user || empty($user->email) || !filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+            if (!$user) {
                 return false;
             }
 
-            Mail::to($user->email, $user->full_name ?: $user->first_name)
-                ->send(new AccountNotificationMail($this, $user));
+            $result = \App\Services\EmailNotificationService::send($this, $user);
 
-            return true;
+            return $result['success'] ?? false;
         } catch (\Throwable $e) {
             Log::error("Failed to send notification email to user #{$this->user_id} ({$e->getMessage()})", [
                 'notification_id' => $this->id ?? null,

@@ -80,14 +80,8 @@ class SendTestNotificationMail extends Command
 
             if (config('mail.default') === 'log') {
                 $this->warn("Note: MAIL_MAILER is set to 'log'. The email was written to storage/logs/laravel.log instead of live delivery.");
-                $this->line("To send live emails to Gmail, update your .env with Gmail SMTP settings:");
-                $this->line("MAIL_MAILER=smtp");
-                $this->line("MAIL_HOST=smtp.gmail.com");
-                $this->line("MAIL_PORT=587");
-                $this->line("MAIL_USERNAME=your-account@gmail.com");
-                $this->line("MAIL_PASSWORD=your-google-app-password");
-                $this->line("MAIL_ENCRYPTION=tls");
-                $this->line("MAIL_FROM_ADDRESS=your-account@gmail.com");
+            } elseif (config('mail.default') === 'resend' || config('services.resend.key')) {
+                $this->info("✔ Email dispatched via Resend HTTPS API (Port 443) to {$targetEmail}!");
             } else {
                 $this->info("✔ Email successfully dispatched to {$targetEmail}!");
             }
