@@ -209,22 +209,6 @@
         </div>
         @endif
 
-        @if(auth()->user()->hasRole('Administrator'))
-        <div class="nav-section">
-            <div class="nav-section-title">
-                <span>System</span>
-            </div>
-            <div class="nav-section-content">
-                <a href="{{ url('/admin/mail-test') }}" class="nav-link {{ request()->is('admin/mail-test*') ? 'active' : '' }}">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect width="20" height="16" x="2" y="4" rx="2"></rect>
-                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
-                    </svg>
-                    <span>Email Diagnostics</span>
-                </a>
-            </div>
-        </div>
-        @endif
     </nav>
 
     <div class="sidebar-footer">

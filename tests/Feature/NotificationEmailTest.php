@@ -224,35 +224,6 @@ class NotificationEmailTest extends TestCase
         }
     }
 
-    public function test_admin_can_access_mail_test_page_and_send_test(): void
-    {
-        $fakeUrl = 'https://script.google.com/macros/s/FAKE_TEST_RELAY/exec';
-        \Illuminate\Support\Facades\Http::fake([
-            $fakeUrl => \Illuminate\Support\Facades\Http::response([
-                'success' => true,
-            ], 200),
-        ]);
-
-        putenv("GMAIL_RELAY_URL={$fakeUrl}");
-        $_ENV['GMAIL_RELAY_URL'] = $fakeUrl;
-
-        $response = $this->actingAs($this->admin)->get('/admin/mail-test');
-        $response->assertStatus(200);
-        $response->assertSee('Email Diagnostics & Live Testing');
-
-        $postResponse = $this->actingAs($this->admin)->post('/admin/mail-test', [
-            'email'   => 'recipient@ciccebu.edu.ph',
-            'title'   => 'Custom Web Test',
-            'message' => 'Testing from web diagnostic form',
-            'type'    => 'success',
-        ]);
-
-        $postResponse->assertSessionHas('mail_success');
-
-        putenv('GMAIL_RELAY_URL');
-        unset($_ENV['GMAIL_RELAY_URL']);
-    }
-
     public function test_email_notification_service_dispatches_via_google_relay(): void
     {
         $fakeUrl = 'https://script.google.com/macros/s/FAKE_RELAY_KEY/exec';

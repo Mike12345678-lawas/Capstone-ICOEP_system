@@ -129,9 +129,5 @@ Route::middleware('auth')->group(function () {
 
     // ─── Calendar API ───
     Route::get('/api/calendar/events', [CalendarController::class, 'getEvents']);
-
-    // ─── Email Diagnostics & Live Testing ───
-    Route::get('/admin/mail-test', [\App\Http\Controllers\Admin\MailTestController::class, 'index']);
-    Route::post('/admin/mail-test', [\App\Http\Controllers\Admin\MailTestController::class, 'send']);
 });
 

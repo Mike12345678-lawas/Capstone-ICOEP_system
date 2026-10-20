@@ -130,27 +130,4 @@ class EmailNotificationService
             ];
         }
     }
-
-    /**
-     * Send a standalone live test email without saving a notification to the database.
-     */
-    public static function testSend(string $recipientEmail, string $title, string $message, string $type = 'info'): array
-    {
-        $dummyUser = new User([
-            'first_name' => 'Test',
-            'last_name'  => 'Recipient',
-            'email'      => $recipientEmail,
-        ]);
-        $dummyUser->id = 0;
-
-        $dummyNotification = new Notification([
-            'user_id' => 0,
-            'title'   => $title,
-            'message' => $message,
-            'type'    => $type,
-            'link'    => '/dashboard',
-        ]);
-
-        return self::send($dummyNotification, $dummyUser);
-    }
 }
