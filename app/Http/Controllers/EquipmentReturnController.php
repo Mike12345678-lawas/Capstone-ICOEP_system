@@ -458,7 +458,8 @@ class EquipmentReturnController extends Controller
                 $equipmentRequest->expected_return_date->format('M d, Y') .
                 " ({$daysOverdue} day(s) overdue). Please return it immediately.",
             'error',
-            '/equipment/' . $equipment->id
+            '/equipment/' . $equipment->id,
+            sendEmail: false
         );
 
         // Send email using existing overdue template if email available

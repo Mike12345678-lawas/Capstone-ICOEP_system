@@ -57,7 +57,8 @@ class SendAutomatedReminders extends Command
                     'Upcoming Reservation Reminder',
                     "Just a reminder that your reservation for \"{$facility->name}\" is scheduled for tomorrow at {$formattedTime}.",
                     'info',
-                    $notificationLink
+                    $notificationLink,
+                    sendEmail: false
                 );
             }
 

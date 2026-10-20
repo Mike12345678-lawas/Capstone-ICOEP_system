@@ -71,9 +71,9 @@
                     <tr>
                         @if($currentScope === 'all')
                             <td data-label="Borrower">
-                                <div style="font-weight: 600; color: var(--color-text-primary);">{{ $req->user->full_name }}</div>
+                                <div style="font-weight: 600; color: var(--color-text-primary);">{{ $req->user?->full_name ?? 'Deleted User' }}</div>
                                 <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                    {{ $req->user->role->name ?? 'User' }} &bull; {{ $req->user->employee_id }}
+                                    {{ $req->user?->role?->name ?? 'User' }} &bull; {{ $req->user?->employee_id ?? '—' }}
                                 </div>
                             </td>
                         @endif
@@ -209,8 +209,8 @@
                     <tr>
                         @if($currentScope === 'all')
                             <td data-label="Borrower">
-                                <div style="font-weight: 600;">{{ $ret->user->full_name }}</div>
-                                <div style="font-size: 0.75rem; color: var(--color-text-muted);">{{ $ret->user->role->name ?? 'User' }} &bull; {{ $ret->user->employee_id }}</div>
+                                <div style="font-weight: 600;">{{ $ret->user?->full_name ?? 'Deleted User' }}</div>
+                                <div style="font-size: 0.75rem; color: var(--color-text-muted);">{{ $ret->user?->role?->name ?? 'User' }} &bull; {{ $ret->user?->employee_id ?? '—' }}</div>
                             </td>
                         @endif
                         <td data-label="Equipment">

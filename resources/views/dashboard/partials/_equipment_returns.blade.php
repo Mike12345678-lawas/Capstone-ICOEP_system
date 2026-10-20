@@ -247,10 +247,10 @@
                                         <strong>REQ-{{ str_pad($m->id, 4, '0', STR_PAD_LEFT) }}</strong>
                                     </td>
                                     <td data-label="Borrower">
-                                        <div style="font-weight: 600;">{{ $m->user->full_name }}</div>
+                                        <div style="font-weight: 600;">{{ $m->user?->full_name ?? 'Deleted User' }}</div>
                                         <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                            {{ $m->user->employee_id ?: $m->user->email }}
-                                            @if($m->user->department)
+                                            {{ $m->user?->employee_id ?: ($m->user?->email ?? '—') }}
+                                            @if($m->user?->department)
                                                 &bull; {{ $m->user->department->code }}
                                             @endif
                                         </div>
@@ -327,12 +327,12 @@
             <div>
                 <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Borrower</span>
                 <div style="font-weight: 600; font-size: 1rem; color: var(--color-text-primary, #0f172a);">
-                    {{ $selectedRequest->user->full_name }}
+                    {{ $selectedRequest->user?->full_name ?? 'Deleted User' }}
                 </div>
                 <div style="font-size: 0.8rem; color: var(--color-text-muted, #64748b);">
-                    ID: {{ $selectedRequest->user->employee_id ?: '—' }} &bull; {{ $selectedRequest->user->role->name ?? 'User' }}
+                    ID: {{ $selectedRequest->user?->employee_id ?: '—' }} &bull; {{ $selectedRequest->user?->role?->name ?? 'User' }}
                 </div>
-                @if($selectedRequest->user->department)
+                @if($selectedRequest->user?->department)
                     <div style="font-size: 0.75rem; color: var(--color-brand-600, #0284c7); margin-top: 0.2rem; font-weight: 500;">
                         {{ $selectedRequest->user->department->name }} ({{ $selectedRequest->user->department->code }})
                     </div>
@@ -399,7 +399,7 @@
                                  style="max-width: 320px; max-height: 220px; border-radius: 8px; border: 1px solid #cbd5e1; object-fit: cover;">
                         </a>
                         <div style="font-size: 0.85rem; color: var(--color-text-muted); max-width: 300px;">
-                            Uploaded by {{ $selectedRequest->user->full_name }} at {{ $selectedRequest->return_requested_at?->format('M d, Y h:i A') }}.
+                            Uploaded by {{ $selectedRequest->user?->full_name ?? 'Borrower' }} at {{ $selectedRequest->return_requested_at?->format('M d, Y h:i A') }}.
                             <div style="margin-top: 0.5rem;">
                                 <a href="{{ $selectedRequest->return_photo_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">
                                     View Full Size ↗
@@ -580,10 +580,10 @@
                                     <strong>REQ-{{ str_pad($req->id, 4, '0', STR_PAD_LEFT) }}</strong>
                                 </td>
                                 <td data-label="Borrower">
-                                    <div style="font-weight: 600;">{{ $req->user->full_name }}</div>
+                                    <div style="font-weight: 600;">{{ $req->user?->full_name ?? 'Deleted User' }}</div>
                                     <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                        {{ $req->user->employee_id ?: $req->user->email }}
-                                        @if($req->user->department)
+                                        {{ $req->user?->employee_id ?: ($req->user?->email ?? '—') }}
+                                        @if($req->user?->department)
                                             &bull; {{ $req->user->department->code }}
                                         @endif
                                     </div>
@@ -666,10 +666,10 @@
                         @forelse($needsCheckRequests as $nc)
                             <tr>
                                 <td data-label="Borrower">
-                                    <div style="font-weight: 600;">{{ $nc->user->full_name }}</div>
+                                    <div style="font-weight: 600;">{{ $nc->user?->full_name ?? 'Deleted User' }}</div>
                                     <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                        {{ $nc->user->employee_id ?: $nc->user->email }}
-                                        @if($nc->user->department)
+                                        {{ $nc->user?->employee_id ?: ($nc->user?->email ?? '—') }}
+                                        @if($nc->user?->department)
                                             &bull; {{ $nc->user->department->code }}
                                         @endif
                                     </div>
@@ -735,10 +735,10 @@
                             @endphp
                             <tr>
                                 <td data-label="Borrower">
-                                    <div style="font-weight: 600;">{{ $od->user->full_name }}</div>
+                                    <div style="font-weight: 600;">{{ $od->user?->full_name ?? 'Deleted User' }}</div>
                                     <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                        {{ $od->user->employee_id ?: $od->user->email }}
-                                        @if($od->user->department)
+                                        {{ $od->user?->employee_id ?: ($od->user?->email ?? '—') }}
+                                        @if($od->user?->department)
                                             &bull; {{ $od->user->department->code }}
                                         @endif
                                     </div>
@@ -799,10 +799,10 @@
                         @forelse($returningTodayRequests as $td)
                             <tr>
                                 <td data-label="Borrower">
-                                    <div style="font-weight: 600;">{{ $td->user->full_name }}</div>
+                                    <div style="font-weight: 600;">{{ $td->user?->full_name ?? 'Deleted User' }}</div>
                                     <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                        {{ $td->user->employee_id ?: $td->user->email }}
-                                        @if($td->user->department)
+                                        {{ $td->user?->employee_id ?: ($td->user?->email ?? '—') }}
+                                        @if($td->user?->department)
                                             &bull; {{ $td->user->department->code }}
                                         @endif
                                     </div>
@@ -860,9 +860,9 @@
                                     <strong>REQ-{{ str_pad($rr->id, 4, '0', STR_PAD_LEFT) }}</strong>
                                 </td>
                                 <td data-label="Borrower">
-                                    <div style="font-weight: 600;">{{ $rr->user->full_name }}</div>
+                                    <div style="font-weight: 600;">{{ $rr->user?->full_name ?? 'Deleted User' }}</div>
                                     <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                        {{ $rr->user->employee_id ?: $rr->user->email }}
+                                        {{ $rr->user?->employee_id ?: ($rr->user?->email ?? '—') }}
                                     </div>
                                 </td>
                                 <td data-label="Equipment">{{ $rr->equipment->name }}</td>

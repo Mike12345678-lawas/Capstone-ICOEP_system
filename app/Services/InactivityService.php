@@ -273,7 +273,8 @@ class InactivityService
                         'Account Inactivity Warning',
                         "Your account has been inactive for {$daysInactive} days and will be automatically deactivated in {$daysRemaining} day(s) without activity.",
                         'warning',
-                        '/dashboard'
+                        '/dashboard',
+                        sendEmail: false
                     );
 
                     // Send email if configured

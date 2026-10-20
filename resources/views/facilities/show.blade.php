@@ -115,7 +115,7 @@
                                     <td data-label="Date">{{ $res->reservation_date->format('M d, Y') }}</td>
                                     <td data-label="Time">{{ \Carbon\Carbon::parse($res->time_start)->format('h:i A') }} - {{ \Carbon\Carbon::parse($res->time_end)->format('h:i A') }}</td>
                                     <td data-label="Title">{{ $res->title }}</td>
-                                    <td data-label="Requested By">{{ $res->user->full_name }}</td>
+                                    <td data-label="Requested By">{{ $res->user?->full_name ?? 'User' }}</td>
                                     <td data-label="Status"><x-status-badge :status="$res->status" /></td>
                                 </tr>
                                 @endforeach

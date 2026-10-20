@@ -74,10 +74,15 @@
                                 <input type="checkbox" class="eq-check" value="{{ $req->id }}">
                             @endif
                         </td>
-                        <td data-label="Requestor" style="font-weight: 600;">{{ $req->user->full_name }}</td>
-                        <td data-label="Equipment">{{ $req->equipment->name }}</td>
+                        <td data-label="Requestor" style="font-weight: 600;">
+                            {{ $req->user?->full_name ?? 'Deleted User' }}
+                            @if($req->user?->trashed())
+                                <span class="badge badge-warning" style="font-size:0.65rem; margin-left: 0.25rem;">Deactivated</span>
+                            @endif
+                        </td>
+                        <td data-label="Equipment">{{ $req->equipment?->name ?? 'Unknown Equipment' }}</td>
                         <td data-label="Quantity">{{ $req->quantity }}</td>
-                        <td data-label="Date Needed">{{ $req->date_needed->format('M d, Y') }}</td>
+                        <td data-label="Date Needed">{{ $req->date_needed?->format('M d, Y') ?? '—' }}</td>
                         <td data-label="Stock">
                             @if($req->status === 'pending' && isset($stockMap[$req->id]))
                                 @php $stock = $stockMap[$req->id]; @endphp

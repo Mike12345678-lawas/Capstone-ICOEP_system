@@ -69,9 +69,9 @@
                     <tr>
                         @if($currentScope === 'all')
                             <td data-label="Reserved By">
-                                <div style="font-weight: 600; color: var(--color-text-primary);">{{ $res->user->full_name }}</div>
+                                <div style="font-weight: 600; color: var(--color-text-primary);">{{ $res->user?->full_name ?? 'Deleted User' }}</div>
                                 <div style="font-size: 0.75rem; color: var(--color-text-muted);">
-                                    {{ $res->user->role->name ?? 'User' }} &bull; {{ $res->user->employee_id }}
+                                    {{ $res->user?->role?->name ?? 'User' }} &bull; {{ $res->user?->employee_id ?? '—' }}
                                 </div>
                             </td>
                         @endif
@@ -181,8 +181,8 @@
                     <tr>
                         @if($currentScope === 'all')
                             <td data-label="Reserved By">
-                                <div style="font-weight: 600;">{{ $res->user->full_name }}</div>
-                                <div style="font-size: 0.75rem; color: var(--color-text-muted);">{{ $res->user->role->name ?? 'User' }} &bull; {{ $res->user->employee_id }}</div>
+                                <div style="font-weight: 600;">{{ $res->user?->full_name ?? 'Deleted User' }}</div>
+                                <div style="font-size: 0.75rem; color: var(--color-text-muted);">{{ $res->user?->role?->name ?? 'User' }} &bull; {{ $res->user?->employee_id ?? '—' }}</div>
                             </td>
                         @endif
                         <td data-label="Facility">

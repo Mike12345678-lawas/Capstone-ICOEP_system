@@ -68,7 +68,8 @@ class CheckOverdueEquipment extends Command
                         $request->expected_return_date->format('M d, Y') .
                         " ({$daysOverdue} day(s) overdue). Please return it immediately.",
                     'error',
-                    '/equipment/' . $equipment->id
+                    '/equipment/' . $equipment->id,
+                    sendEmail: false
                 );
             }
 

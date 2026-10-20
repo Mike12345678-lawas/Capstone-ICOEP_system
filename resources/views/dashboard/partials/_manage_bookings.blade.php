@@ -77,9 +77,14 @@
                                 <input type="checkbox" class="booking-check" value="{{ $res->id }}">
                             @endif
                         </td>
-                        <td data-label="Requestor" style="font-weight: 600;">{{ $res->user->full_name }}</td>
-                        <td data-label="Facility">{{ $res->facility->name }}</td>
-                        <td data-label="Date &amp; Time">{{ $res->reservation_date->format('M d, Y') }}<br><small class="text-muted">{{ \Carbon\Carbon::parse($res->time_start)->format('h:i A') }} – {{ \Carbon\Carbon::parse($res->time_end)->format('h:i A') }}</small></td>
+                        <td data-label="Requestor" style="font-weight: 600;">
+                            {{ $res->user?->full_name ?? 'Deleted User' }}
+                            @if($res->user?->trashed())
+                                <span class="badge badge-warning" style="font-size:0.65rem; margin-left: 0.25rem;">Deactivated</span>
+                            @endif
+                        </td>
+                        <td data-label="Facility">{{ $res->facility?->name ?? 'Unknown Facility' }}</td>
+                        <td data-label="Date &amp; Time">{{ $res->reservation_date?->format('M d, Y') ?? '—' }}<br><small class="text-muted">{{ \Carbon\Carbon::parse($res->time_start)->format('h:i A') }} – {{ \Carbon\Carbon::parse($res->time_end)->format('h:i A') }}</small></td>
                         <td data-label="Purpose" title="{{ $res->title }}">{{ Str::limit($res->title, 40) }}</td>
                         <td data-label="Conflict">
                             @if($res->status === 'pending' && isset($conflictMap[$res->id]))
