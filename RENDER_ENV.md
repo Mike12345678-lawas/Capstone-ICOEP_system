@@ -20,20 +20,14 @@ Replace every `<placeholder>` with your real value **in Render only** — never 
 | `SESSION_DRIVER` | `file` |
 | `CACHE_STORE` | `file` |
 | `GMAIL_RELAY_URL` | `https://script.google.com/macros/s/.../exec` (Recommended: sends to ANY @ciccebu.edu.ph school account!) |
-| `MAIL_MAILER` | `resend` (Alternative if using Resend) |
-| `RESEND_API_KEY` | `re_...` (Alternative if using Resend) |
-| `MAIL_FROM_ADDRESS` | `onboarding@resend.dev` |
+| `MAIL_FROM_ADDRESS` | `verallo.s@ciccebu.edu.ph` |
 | `MAIL_FROM_NAME` | `ICOEP System` |
 
 > ### 💡 Email on Render Free Tier
-> Render's Free tier blocks outbound SMTP ports (25, 465, 587).
-> You have two working HTTPS (Port 443) options:
+> Render's Free tier blocks standard outbound SMTP ports (25, 465, 587).
+> To deliver emails to **any student/faculty @ciccebu.edu.ph school account** without domain restrictions or blocks, add **`GMAIL_RELAY_URL`** with your public Google Apps Script Web App URL. It delivers over HTTPS (Port 443) with zero restrictions!
 > 
-> **Option 1 (Best for School Accounts — Google Apps Script Relay):**
-> Add `GMAIL_RELAY_URL` with your public Google Apps Script Web App URL. It sends directly via Google to **any student/faculty @ciccebu.edu.ph school account** with zero domain restrictions!
->
-> **Option 2 (Resend):**
-> Add `RESEND_API_KEY` and set `MAIL_MAILER=resend`. Note: Resend's free sandbox (`onboarding@resend.dev`) only sends to the single email registered on that Resend account.
+> When your system is eventually deployed on the school's official host/server with open SMTP, simply set standard SMTP variables (`MAIL_MAILER=smtp`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`).
 
 > This project uses Laravel 12, so `CACHE_DRIVER` is **not** needed (`CACHE_STORE` replaced it in Laravel 11+).
 

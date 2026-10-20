@@ -19,7 +19,7 @@
         <div>
             <strong>Email Sent Successfully!</strong>
             <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">{{ session('mail_success') }}</p>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.8rem; color: #047857;">If using a personal email, check your <strong>Inbox</strong> and <strong>Spam / Junk</strong> folder.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.8rem; color: #047857;">Check the recipient's <strong>Inbox</strong> and <strong>Spam / Junk</strong> folder.</p>
         </div>
     </div>
 @endif
@@ -40,7 +40,7 @@
         <div class="card animate-fade-in-up" style="animation-delay: 50ms;">
             <div class="card-header">
                 <h3 class="card-title">Send Live Test Email</h3>
-                <span class="badge {{ $activeMailer === 'resend' ? 'badge-success' : ($activeMailer === 'smtp' ? 'badge-warning' : 'badge-neutral') }}">
+                <span class="badge {{ $activeMailer === 'gmail-relay' ? 'badge-success' : ($activeMailer === 'smtp' ? 'badge-warning' : 'badge-neutral') }}">
                     Driver: {{ strtoupper($activeMailer) }}
                 </span>
             </div>
@@ -59,15 +59,11 @@
                             value="{{ old('email', $currentUser->email ?? '') }}"
                             required
                             class="form-control"
-                            placeholder="e.g. yourname@gmail.com"
+                            placeholder="e.g. verallo.s@ciccebu.edu.ph"
                             style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #d1d5db; border-radius: 6px;"
                         >
                         <span class="text-muted" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;">
-                            @if($activeMailer === 'resend')
-                                With free Resend test sender (<code>onboarding@resend.dev</code>), use the email address registered on your Resend account.
-                            @else
-                                Enter any accessible email address to test live delivery.
-                            @endif
+                            Enter any @ciccebu.edu.ph school account or personal email address.
                         </span>
                     </div>
 
@@ -129,31 +125,21 @@
                 <table class="data-table" style="width: 100%; margin: 0;">
                     <tbody>
                         <tr>
-                            <td style="font-weight: 600; padding: 0.75rem 1rem;">Active Mailer</td>
+                            <td style="font-weight: 600; padding: 0.75rem 1rem;">Active Driver</td>
                             <td style="padding: 0.75rem 1rem;">
                                 <code>{{ $activeMailer }}</code>
                                 @if($activeMailer === 'gmail-relay')
-                                    <span style="color: #059669; font-size: 0.8rem; margin-left: 0.25rem;">(Google Apps Script Relay — Unlimited School Recipients!)</span>
-                                @elseif($activeMailer === 'resend')
-                                    <span style="color: #059669; font-size: 0.8rem; margin-left: 0.25rem;">(HTTPS Port 443 — Render Free friendly)</span>
+                                    <span style="color: #059669; font-size: 0.8rem; margin-left: 0.25rem;">(Google Apps Script Relay — HTTPS Port 443)</span>
                                 @elseif($activeMailer === 'smtp')
                                     <span style="color: #d97706; font-size: 0.8rem; margin-left: 0.25rem;">(Standard SMTP)</span>
                                 @endif
                             </td>
                         </tr>
-                        @if($relayUrlSet)
                         <tr>
                             <td style="font-weight: 600; padding: 0.75rem 1rem;">Google Relay</td>
                             <td style="padding: 0.75rem 1rem;">
-                                <span style="color: #059669;">✔ Active (Delivers to all @ciccebu.edu.ph school accounts)</span>
-                            </td>
-                        </tr>
-                        @endif
-                        <tr>
-                            <td style="font-weight: 600; padding: 0.75rem 1rem;">Resend API Key</td>
-                            <td style="padding: 0.75rem 1rem;">
-                                @if($resendKeySet)
-                                    <span style="color: #059669;">✔ Configured ({{ $resendMasked }})</span>
+                                @if($relayUrlSet)
+                                    <span style="color: #059669;">✔ Active (Delivers to all @ciccebu.edu.ph school accounts)</span>
                                 @else
                                     <span style="color: #dc2626;">✖ Not Configured</span>
                                 @endif
@@ -161,11 +147,11 @@
                         </tr>
                         <tr>
                             <td style="font-weight: 600; padding: 0.75rem 1rem;">From Address</td>
-                            <td style="padding: 0.75rem 1rem;"><code>{{ $fromAddress ?: 'Not Set' }}</code></td>
+                            <td style="padding: 0.75rem 1rem;"><code>{{ $fromAddress ?: 'Default' }}</code></td>
                         </tr>
                         <tr>
                             <td style="font-weight: 600; padding: 0.75rem 1rem;">From Name</td>
-                            <td style="padding: 0.75rem 1rem;">{{ $fromName ?: 'Not Set' }}</td>
+                            <td style="padding: 0.75rem 1rem;">{{ $fromName ?: config('icoep.app_full_name', 'ICOEP System') }}</td>
                         </tr>
                         @if($activeMailer === 'smtp')
                         <tr>
@@ -182,28 +168,19 @@
             </div>
         </div>
 
-        {{-- Free Tier Resend Guide Card --}}
+        {{-- Free Tier Google Relay Guide Card --}}
         <div class="card animate-fade-in-up" style="animation-delay: 150ms; border-left: 4px solid var(--color-brand-500, #0ea5e9);">
             <div class="card-header">
-                <h3 class="card-title">💡 Why Resend on Render Free?</h3>
+                <h3 class="card-title">💡 Email Delivery on Render Free</h3>
             </div>
             <div class="card-body" style="font-size: 0.875rem; line-height: 1.6;">
-                <p>Render's Free tier blocks all outgoing SMTP ports (<strong>25, 465, and 587</strong>) to prevent spam.</p>
-                <p><strong>Resend</strong> works by sending emails over <strong>HTTPS (Port 443)</strong>, which Render never blocks.</p>
+                <p>Render's Free tier blocks outbound SMTP ports (<strong>25, 465, and 587</strong>) to prevent spam.</p>
+                <p><strong>Google Apps Script Relay</strong> delivers emails over <strong>HTTPS (Port 443)</strong>, which Render never blocks. It delivers directly to <strong>all students and faculty @ciccebu.edu.ph</strong> with zero restrictions.</p>
                 <div style="background-color: var(--color-bg-secondary, #f8fafc); padding: 0.75rem; border-radius: 6px; margin-top: 0.75rem;">
-                    <strong>Quick Setup in 2 minutes:</strong>
-                    <ol style="padding-left: 1.25rem; margin: 0.5rem 0 0 0;">
-                        <li>Sign up at <a href="https://resend.com" target="_blank" rel="noopener" style="color: #0ea5e9; text-decoration: underline;">resend.com</a> (Free: 3,000 emails/mo).</li>
-                        <li>Create an API Key and copy it (starts with <code>re_...</code>).</li>
-                        <li>In Render Dashboard → Environment, add:
-                            <ul style="padding-left: 1rem; margin-top: 0.25rem;">
-                                <li><code>MAIL_MAILER</code> = <code>resend</code></li>
-                                <li><code>RESEND_API_KEY</code> = <code>re_your_api_key</code></li>
-                                <li><code>MAIL_FROM_ADDRESS</code> = <code>onboarding@resend.dev</code></li>
-                                <li><code>MAIL_FROM_NAME</code> = <code>ICOEP System</code></li>
-                            </ul>
-                        </li>
-                    </ol>
+                    <strong>Configuration in Render:</strong>
+                    <ul style="padding-left: 1.25rem; margin: 0.5rem 0 0 0;">
+                        <li><code>GMAIL_RELAY_URL</code> = <code>https://script.google.com/macros/s/.../exec</code></li>
+                    </ul>
                 </div>
             </div>
         </div>

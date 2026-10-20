@@ -80,8 +80,8 @@ class SendTestNotificationMail extends Command
 
             if (config('mail.default') === 'log') {
                 $this->warn("Note: MAIL_MAILER is set to 'log'. The email was written to storage/logs/laravel.log instead of live delivery.");
-            } elseif (config('mail.default') === 'resend' || config('services.resend.key')) {
-                $this->info("✔ Email dispatched via Resend HTTPS API (Port 443) to {$targetEmail}!");
+            } elseif (env('GMAIL_RELAY_URL')) {
+                $this->info("✔ Email dispatched via Google Apps Script Relay (HTTPS) to {$targetEmail}!");
             } else {
                 $this->info("✔ Email successfully dispatched to {$targetEmail}!");
             }

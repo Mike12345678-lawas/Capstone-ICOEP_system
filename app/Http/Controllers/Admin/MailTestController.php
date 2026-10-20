@@ -16,33 +16,30 @@ class MailTestController extends Controller
     {
         $user = Auth::user();
 
-        $resendKey = (string) (config('services.resend.key') ?: env('RESEND_API_KEY'));
-        $resendMasked = $resendKey
-            ? substr($resendKey, 0, 7) . '••••••••' . substr($resendKey, -4)
-            : 'Not Configured';
-
         $smtpPassword = (string) config('mail.mailers.smtp.password');
-
         $relayUrl = env('GMAIL_RELAY_URL');
         $effectiveMailer = $relayUrl ? 'gmail-relay' : config('mail.default');
 
+        $relayMasked = $relayUrl
+            ? substr($relayUrl, 0, 35) . '••••••••' . substr($relayUrl, -8)
+            : 'Not Configured';
+
         return view('admin.mail_test', [
-            'pageTitle'    => 'Email Diagnostics & Testing',
-            'breadcrumb'   => [
+            'pageTitle'       => 'Email Diagnostics & Testing',
+            'breadcrumb'      => [
                 ['label' => 'Dashboard', 'url' => '/dashboard'],
                 ['label' => 'Email Diagnostics'],
             ],
-            'currentUser'  => $user,
-            'activeMailer' => $effectiveMailer,
-            'relayUrlSet'  => !empty($relayUrl),
-            'resendKeySet' => !empty($resendKey),
-            'resendMasked' => $resendMasked,
-            'fromAddress'  => config('mail.from.address'),
-            'fromName'     => config('mail.from.name'),
-            'smtpHost'     => config('mail.mailers.smtp.host'),
-            'smtpPort'     => config('mail.mailers.smtp.port'),
-            'smtpUsername' => config('mail.mailers.smtp.username'),
-            'smtpPassSet'  => !empty($smtpPassword),
+            'currentUser'     => $user,
+            'activeMailer'    => $effectiveMailer,
+            'relayUrlSet'     => !empty($relayUrl),
+            'relayUrlMasked'  => $relayMasked,
+            'fromAddress'     => config('mail.from.address'),
+            'fromName'        => config('mail.from.name'),
+            'smtpHost'        => config('mail.mailers.smtp.host'),
+            'smtpPort'        => config('mail.mailers.smtp.port'),
+            'smtpUsername'    => config('mail.mailers.smtp.username'),
+            'smtpPassSet'     => !empty($smtpPassword),
         ]);
     }
 

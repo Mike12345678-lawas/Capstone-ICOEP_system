@@ -13,7 +13,7 @@ class EmailNotificationService
 {
     /**
      * Dispatch an email notification to the recipient user.
-     * Uses Resend HTTPS API (port 443) when configured or standard Laravel Mailer.
+     * Uses Google Apps Script HTTPS Relay (Port 443) when configured, or standard Laravel Mailer.
      *
      * @return array{success: bool, provider: string, message: string, details?: mixed}
      */
@@ -28,20 +28,14 @@ class EmailNotificationService
         }
 
         $relayUrl = env('GMAIL_RELAY_URL');
-        $resendKey = config('services.resend.key') ?: env('RESEND_API_KEY');
-        $activeMailer = config('mail.default');
 
         // Priority 1: Google Apps Script Web Relay (Sends to any school/personal email over HTTPS)
-        if ($relayUrl && ($activeMailer === 'gmail-relay' || empty($resendKey) || $activeMailer === 'resend')) {
+        if (!empty($relayUrl)) {
             return self::sendViaGoogleRelay($notification, $user, $relayUrl);
         }
 
-        // Priority 2: Resend HTTP API (Port 443)
-        if ($activeMailer === 'resend' || ($resendKey && $activeMailer !== 'log' && $activeMailer !== 'array')) {
-            return self::sendViaResend($notification, $user, (string) $resendKey);
-        }
-
-        // Standard Laravel Mailer (SMTP, Log, etc.)
+        // Priority 2: Standard Laravel Mailer (SMTP, Log, etc.)
+        $activeMailer = config('mail.default', 'log');
         try {
             Mail::to($user->email, $user->full_name ?: $user->first_name)
                 ->send(new AccountNotificationMail($notification, $user));
@@ -59,83 +53,6 @@ class EmailNotificationService
             return [
                 'success'  => false,
                 'provider' => $activeMailer,
-                'message'  => $msg,
-            ];
-        }
-    }
-
-    /**
-     * Send email via Resend's REST API over HTTPS (port 443).
-     * Bypasses all cloud firewall SMTP port blocks (such as Render Free tier).
-     */
-    public static function sendViaResend(Notification $notification, User $user, string $apiKey): array
-    {
-        if (empty($apiKey)) {
-            $msg = 'RESEND_API_KEY is missing or empty. Please set it in your environment.';
-            Log::error("EmailNotificationService: {$msg}");
-            error_log("EmailNotificationService: {$msg}");
-            return [
-                'success'  => false,
-                'provider' => 'resend',
-                'message'  => $msg,
-            ];
-        }
-
-        try {
-            $mailable = new AccountNotificationMail($notification, $user);
-            $htmlContent = view('emails.account_notification', [
-                'notification' => $notification,
-                'user'         => $user,
-                'actionUrl'    => $mailable->actionUrl,
-                'typeTheme'    => $mailable->getTypeTheme(),
-            ])->render();
-
-            $fromName    = config('mail.from.name', config('icoep.app_full_name', 'ICOEP System'));
-            $fromAddress = config('mail.from.address') ?: 'onboarding@resend.dev';
-
-            // Ensure sender is formatted as "Name <email@domain>"
-            $fromHeader = "{$fromName} <{$fromAddress}>";
-
-            $response = Http::withToken($apiKey)
-                ->timeout(15)
-                ->acceptJson()
-                ->post('https://api.resend.com/emails', [
-                    'from'    => $fromHeader,
-                    'to'      => [$user->email],
-                    'subject' => $mailable->envelope()->subject,
-                    'html'    => $htmlContent,
-                ]);
-
-            if ($response->successful()) {
-                $id = $response->json('id', 'ok');
-                Log::info("Email successfully dispatched via Resend to {$user->email} (ID: {$id})");
-                return [
-                    'success'  => true,
-                    'provider' => 'resend',
-                    'message'  => "Delivered via Resend HTTPS API (Message ID: {$id}) to {$user->email}.",
-                    'details'  => $response->json(),
-                ];
-            }
-
-            $body = $response->json() ?: ['error' => $response->body()];
-            $errorMsg = $body['message'] ?? $response->body();
-            Log::error("Resend API rejected email to {$user->email}: {$errorMsg}", $body);
-            error_log("Resend API error: {$errorMsg}");
-
-            return [
-                'success'  => false,
-                'provider' => 'resend',
-                'message'  => "Resend API error: {$errorMsg}",
-                'details'  => $body,
-            ];
-        } catch (\Throwable $e) {
-            $msg = "Resend connection error: " . $e->getMessage();
-            Log::error("EmailNotificationService: {$msg}", ['exception' => $e]);
-            error_log("EmailNotificationService error: {$msg}");
-
-            return [
-                'success'  => false,
-                'provider' => 'resend',
                 'message'  => $msg,
             ];
         }
@@ -197,7 +114,7 @@ class EmailNotificationService
             }
 
             return [
-                'success'  => true, // Often Google Apps Script returns 200 without JSON
+                'success'  => true,
                 'provider' => 'gmail-relay',
                 'message'  => "Dispatched to {$user->email} via Google Apps Script Relay.",
             ];
