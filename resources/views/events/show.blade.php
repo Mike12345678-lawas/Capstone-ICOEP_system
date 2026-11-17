@@ -26,6 +26,14 @@
                 </a>
                 <a href="{{ url('/events/' . $event->id . '/manage') }}" class="btn btn-secondary">Manage</a>
             @endif
+            @if(auth()->check() && (auth()->user()->hasRole('Administrator') || ($event->organizer_id === auth()->id() && in_array($event->status, ['pending', 'rejected'], true))))
+                <form method="POST" action="{{ url('/events/' . $event->id) }}" style="display: inline; margin: 0;" onsubmit="return confirm('Are you sure you want to delete this event?');">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="btn btn-secondary" style="color: #ef4444; border-color: #ef4444;">
+                        Delete Event
+                    </button>
+                </form>
+            @endif
             <a href="{{ url('/dashboard?section=events') }}" class="btn btn-secondary">&larr; Back</a>
         </div>
     </div>

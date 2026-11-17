@@ -110,6 +110,9 @@
                             <x-status-badge :status="$event->status" />
                         </td>
                         <td data-label="Action" class="card-actions-cell">
+                            @php
+                                $canDelete = auth()->check() && (auth()->user()->hasRole('Administrator') || ($event->organizer_id === auth()->id() && in_array($event->status, ['pending', 'rejected'], true)));
+                            @endphp
                             @if(($event->status === 'pending') && (auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage')))
                                 <div style="display: flex; gap: 0.35rem; align-items: center; justify-content: flex-end; flex-wrap: wrap;">
                                     <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}" style="display: inline; margin: 0;" onsubmit="return confirm('Approve event request: {{ addslashes($event->title) }}?');">
@@ -121,12 +124,30 @@
                                     <button type="button" class="btn btn-secondary btn-sm" style="color: #ef4444; border-color: #ef4444; padding: 0.3rem 0.65rem; font-size: 0.75rem;" title="Reject event request" onclick="openDashboardEventRejectModal({{ $event->id }}, '{{ addslashes($event->title) }}')">
                                         ✕ Reject
                                     </button>
+                                    @if($canDelete)
+                                        <form method="POST" action="{{ url('/events/' . $event->id) }}" style="display: inline; margin: 0;" onsubmit="return confirm('Delete event: {{ addslashes($event->title) }}?');">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: #ef4444; border-color: #ef4444; padding: 0.3rem 0.65rem; font-size: 0.75rem;" title="Delete event">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    @endif
                                     <a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">
                                         View
                                     </a>
                                 </div>
                             @else
-                                <a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">View Details</a>
+                                <div style="display: flex; gap: 0.35rem; align-items: center; justify-content: flex-end; flex-wrap: wrap;">
+                                    @if($canDelete)
+                                        <form method="POST" action="{{ url('/events/' . $event->id) }}" style="display: inline; margin: 0;" onsubmit="return confirm('Delete event: {{ addslashes($event->title) }}?');">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: #ef4444; border-color: #ef4444; padding: 0.3rem 0.65rem; font-size: 0.75rem;" title="Delete event">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    @endif
+                                    <a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm" style="{{ $canDelete ? 'padding: 0.3rem 0.65rem; font-size: 0.75rem;' : 'width: 100%;' }}">View Details</a>
+                                </div>
                             @endif
                         </td>
                     </tr>

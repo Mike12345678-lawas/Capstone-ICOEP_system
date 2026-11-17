@@ -158,7 +158,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/events/{event}/approve', [EventController::class, 'approve'])->middleware('permission:event.manage');
     Route::patch('/events/{event}/reject', [EventController::class, 'reject'])->middleware('permission:event.manage');
     Route::post('/events/{event}/attendance', [EventController::class, 'markAttendance'])->middleware('permission:event.manage');
-    Route::delete('/events/{event}', [EventController::class, 'destroy'])->middleware('permission:event.manage');
+    Route::delete('/events/{event}', [EventController::class, 'destroy'])->middleware('permission:event.view');
 
     // ─── Event Scanner & QR Attendance ───
     Route::get('/events/{event}/scanner', [EventController::class, 'scanner'])->middleware('permission:event.manage');

@@ -568,6 +568,14 @@ class EventController extends Controller
 
     public function destroy(Event $event)
     {
+        $user = Auth::user();
+        $isAdmin = $user && $user->hasRole('Administrator');
+        $isOrganizerAllowed = $user && $event->organizer_id === $user->id && in_array($event->status, ['pending', 'rejected'], true);
+
+        if (!$isAdmin && !$isOrganizerAllowed) {
+            abort(403, 'Unauthorized. You can only delete your own pending or rejected event requests.');
+        }
+
         $event->delete();
         AuditLog::log('DELETE_EVENT', 'events', $event->id);
 
