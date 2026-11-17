@@ -28,7 +28,12 @@
             <div class="filter-group">
                 <a href="{{ url('/dashboard?section=events') }}" class="filter-btn {{ empty($statusFilter) ? 'active' : '' }}">All</a>
                 @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.create'))
-                    <a href="{{ url('/dashboard?section=events&status=pending') }}" class="filter-btn {{ ($statusFilter ?? '') === 'pending' ? 'active' : '' }}">Pending</a>
+                    <a href="{{ url('/dashboard?section=events&status=pending') }}" class="filter-btn {{ ($statusFilter ?? '') === 'pending' ? 'active' : '' }}">
+                        Pending
+                        @if(($pendingEventsCount ?? 0) > 0)
+                            <span class="badge" style="background: #f59e0b; color: #ffffff; margin-left: 4px; font-size: 0.7rem; padding: 1px 6px; border-radius: 9999px;">{{ $pendingEventsCount }}</span>
+                        @endif
+                    </a>
                 @endif
                 <a href="{{ url('/dashboard?section=events&status=upcoming') }}" class="filter-btn {{ ($statusFilter ?? '') === 'upcoming' ? 'active' : '' }}">Upcoming</a>
                 <a href="{{ url('/dashboard?section=events&status=ongoing') }}" class="filter-btn {{ ($statusFilter ?? '') === 'ongoing' ? 'active' : '' }}">Ongoing</a>
@@ -48,6 +53,17 @@
             </div>
             @endif
         </form>
+
+        @if(($statusFilter ?? '') === 'pending' && (auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage')))
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: #92400e; font-size: 0.875rem;">
+                <span style="font-size: 1.15rem;">⏳</span>
+                <span><strong>Event Requests Awaiting Review:</strong> Faculty and staff event submissions pending administrative approval. You can approve or reject directly from the table, or click View for full details.</span>
+            </div>
+            <span class="badge" style="background: #f59e0b; color: #ffffff; font-weight: 700; padding: 3px 8px; border-radius: 9999px;">{{ $pendingEventsCount ?? $events->total() }} Pending</span>
+        </div>
+        @endif
+
         <div class="table-responsive manage-table-responsive">
             <table class="data-table mobile-cards">
                 <thead>
@@ -56,7 +72,14 @@
                 <tbody>
                 @forelse($events as $event)
                     <tr>
-                        <td data-label="Title" style="font-weight: 600;">{{ $event->title }}</td>
+                        <td data-label="Title" style="font-weight: 600;">
+                            <div>{{ $event->title }}</div>
+                            @if($event->status === 'pending' && $event->organizer)
+                                <div style="font-size: 0.75rem; color: var(--color-surface-600); font-weight: 400; margin-top: 2px;">
+                                    Requested by: <strong>{{ $event->organizer->full_name }}</strong>
+                                </div>
+                            @endif
+                        </td>
                         <td data-label="Date">{{ $event->event_date->format('M d, Y') }}</td>
                         <td data-label="Venue">{{ $event->venue ?: '—' }}</td>
                         <td data-label="Type"><span class="badge badge-general">{{ ucfirst($event->event_type) }}</span></td>
@@ -86,7 +109,26 @@
                         <td data-label="Status">
                             <x-status-badge :status="$event->status" />
                         </td>
-                        <td data-label="Action" class="card-actions-cell"><a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">View Details</a></td>
+                        <td data-label="Action" class="card-actions-cell">
+                            @if(($event->status === 'pending') && (auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage')))
+                                <div style="display: flex; gap: 0.35rem; align-items: center; justify-content: flex-end; flex-wrap: wrap;">
+                                    <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}" style="display: inline; margin: 0;" onsubmit="return confirm('Approve event request: {{ addslashes($event->title) }}?');">
+                                        @csrf @method('PATCH')
+                                        <button type="submit" class="btn btn-primary btn-sm" style="background: #10b981; border-color: #10b981; padding: 0.3rem 0.65rem; font-size: 0.75rem;" title="Approve event request">
+                                            ✓ Approve
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-secondary btn-sm" style="color: #ef4444; border-color: #ef4444; padding: 0.3rem 0.65rem; font-size: 0.75rem;" title="Reject event request" onclick="openDashboardEventRejectModal({{ $event->id }}, '{{ addslashes($event->title) }}')">
+                                        ✕ Reject
+                                    </button>
+                                    <a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">
+                                        View
+                                    </a>
+                                </div>
+                            @else
+                                <a href="{{ url('/events/' . $event->id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">View Details</a>
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
@@ -108,3 +150,54 @@
         {{ $events->withQueryString()->links('partials.pagination') }}
     </div>
 </div>
+
+@if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage'))
+<div id="dashboardEventRejectModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #ffffff; border-radius: 12px; max-width: 480px; width: 100%; padding: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; font-size: 1.15rem; color: #dc2626;">Reject Event Request</h3>
+        <p style="color: var(--color-surface-600); font-size: 0.9rem; margin-bottom: 1rem;">
+            Are you sure you want to reject <strong id="rejectModalEventTitle">this event</strong>? You may optionally provide a reason for the organizer.
+        </p>
+        <form id="dashboardEventRejectForm" method="POST" action="">
+            @csrf @method('PATCH')
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label" for="dashboard_reject_remarks">Reason / Remarks (Optional)</label>
+                <textarea name="remarks" id="dashboard_reject_remarks" class="form-control" rows="3" placeholder="Explain why this event request cannot be approved..."></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeDashboardEventRejectModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #ef4444; border-color: #ef4444;">Confirm Rejection</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openDashboardEventRejectModal(eventId, eventTitle) {
+    var modal = document.getElementById('dashboardEventRejectModal');
+    var form = document.getElementById('dashboardEventRejectForm');
+    var titleEl = document.getElementById('rejectModalEventTitle');
+    var textarea = document.getElementById('dashboard_reject_remarks');
+    
+    if (form) {
+        form.action = '{{ url("/events") }}/' + eventId + '/reject';
+    }
+    if (titleEl) {
+        titleEl.textContent = '"' + eventTitle + '"';
+    }
+    if (textarea) {
+        textarea.value = '';
+    }
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeDashboardEventRejectModal() {
+    var modal = document.getElementById('dashboardEventRejectModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+</script>
+@endif

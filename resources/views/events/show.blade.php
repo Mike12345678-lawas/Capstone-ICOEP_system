@@ -8,8 +8,8 @@
     </div>
     <div class="header-actions-mobile">
         <div class="btn-row-mobile">
-            @if(auth()->user()->hasRole('Administrator') && $event->status === 'pending')
-                <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}" style="display: inline;">
+            @if((auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage')) && $event->status === 'pending')
+                <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}" style="display: inline;" onsubmit="return confirm('Approve event: {{ addslashes($event->title) }}?');">
                     @csrf @method('PATCH')
                     <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">
                         ✓ Approve Event
@@ -37,16 +37,16 @@
         <div>
             <h3 style="color: #b45309; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.25rem 0;">⏳ Pending Administrative Approval</h3>
             <p style="color: var(--color-surface-700); margin: 0; font-size: 0.9rem;">
-                @if(auth()->user()->hasRole('Administrator'))
+                @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage'))
                     This event request was submitted by <strong>{{ $event->organizer->full_name }}</strong> and is waiting for your review.
                 @else
                     Your event request has been submitted to the administration. You will be notified once an administrator approves or reviews it.
                 @endif
             </p>
         </div>
-        @if(auth()->user()->hasRole('Administrator'))
+        @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage'))
             <div style="display: flex; gap: 0.5rem;">
-                <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}">
+                <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}" onsubmit="return confirm('Approve event: {{ addslashes($event->title) }}?');">
                     @csrf @method('PATCH')
                     <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">Approve</button>
                 </form>
@@ -209,7 +209,7 @@
 </script>
 @endpush
 @endif
-@if(auth()->user()->hasRole('Administrator') && $event->status === 'pending')
+@if((auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage')) && $event->status === 'pending')
 <div id="rejectModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
     <div style="background: #ffffff; border-radius: 12px; max-width: 480px; width: 100%; padding: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
         <h3 style="margin-top: 0; font-size: 1.15rem; color: #dc2626;">Reject Event Request</h3>

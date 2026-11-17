@@ -46,7 +46,13 @@
                 @forelse($needsActionEventRequests as $ev)
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
                     <span>{{ $ev->organizer->full_name }} — <strong>{{ $ev->title }}</strong> ({{ $ev->event_date->format('M d') }})</span>
-                    <a href="{{ url('/events/' . $ev->id) }}" class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Review</a>
+                    <div style="display: flex; gap: 0.25rem; align-items: center;">
+                        <form method="POST" action="{{ url('/events/' . $ev->id . '/approve') }}" style="display: inline; margin: 0;" onsubmit="return confirm('Approve event request: {{ addslashes($ev->title) }}?');">
+                            @csrf @method('PATCH')
+                            <button type="submit" class="btn btn-primary btn-sm" style="background: #10b981; border-color: #10b981; font-size:.75rem; padding:.2rem .45rem;" title="Quick Approve">✓ Approve</button>
+                        </form>
+                        <a href="{{ url('/events/' . $ev->id) }}" class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Review</a>
+                    </div>
                 </div>
                 @empty
                 <p class="text-muted" style="font-size:.85rem;margin:0;">None pending.</p>

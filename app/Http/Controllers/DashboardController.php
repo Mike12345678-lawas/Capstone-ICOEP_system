@@ -420,9 +420,10 @@ class DashboardController extends Controller
             });
         }
 
-        $data['events']         = $query->orderByDesc('event_date')->paginate(15);
-        $data['statusFilter']   = $status;
-        $data['audienceFilter'] = $audience;
+        $data['events']             = $query->orderByDesc('event_date')->paginate(15);
+        $data['statusFilter']       = $status;
+        $data['audienceFilter']     = $audience;
+        $data['pendingEventsCount'] = Event::where('status', 'pending')->count();
     }
 
     // ─── ANNOUNCEMENTS ───────────────────────────────────────────────────

@@ -102,7 +102,7 @@
                 <span>Engagement</span>
             </div>
             <div class="nav-section-content">
-                <a href="{{ url('/dashboard?section=events') }}" class="nav-link {{ $currentSection === 'events' ? 'active' : '' }}">
+                <a href="{{ url('/dashboard?section=events') }}" class="nav-link {{ ($currentSection === 'events' && request('status') !== 'pending') ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                         <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -121,7 +121,7 @@
             </div>
         </div>
 
-        @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('facility.approve') || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('user.view') || auth()->user()->hasPermission('equipment.manage') || auth()->user()->hasPermission('inventory.manage_own') || auth()->user()->hasPermission('facility.manage'))
+        @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('facility.approve') || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('user.view') || auth()->user()->hasPermission('equipment.manage') || auth()->user()->hasPermission('inventory.manage_own') || auth()->user()->hasPermission('facility.manage') || auth()->user()->hasPermission('event.manage'))
         <div class="nav-section">
             <div class="nav-section-title">
                 <span>Management</span>
@@ -136,6 +136,27 @@
                         <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
                     <span>Users</span>
+                </a>
+                @endif
+
+                @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.manage'))
+                @php
+                    $pendingEventsNavCount = \App\Models\Event::where('status', 'pending')->count();
+                @endphp
+                <a href="{{ url('/dashboard?section=events&status=pending') }}" class="nav-link {{ ($currentSection === 'events' && request('status') === 'pending') ? 'active' : '' }}" style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                            <path d="M9 16l2 2 4-4"></path>
+                        </svg>
+                        <span>Event Requests</span>
+                    </div>
+                    @if($pendingEventsNavCount > 0)
+                        <span class="badge" style="background: #f59e0b; color: #ffffff; font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px;">{{ $pendingEventsNavCount }}</span>
+                    @endif
                 </a>
                 @endif
 
