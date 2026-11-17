@@ -475,6 +475,37 @@ class EquipmentController extends Controller
         return back()->with('success', "Request {$request->status} successfully.");
     }
 
+    /**
+     * Issue approved equipment for pickup (moves status to borrowed).
+     */
+    public function pickup(Request $request, EquipmentRequest $equipmentRequest)
+    {
+        if (!Auth::user()->hasPermission('equipment.issue') && !Auth::user()->hasPermission('equipment.approve')) {
+            abort(403, 'Unauthorized to issue equipment.');
+        }
+
+        if ($equipmentRequest->status !== 'approved') {
+            return back()->with('error', 'Only approved equipment requests can be marked as picked up.');
+        }
+
+        $equipmentRequest->update([
+            'status'      => 'borrowed',
+            'borrowed_at' => now(),
+        ]);
+
+        AuditLog::log('ISSUE_EQUIPMENT', 'equipment_requests', $equipmentRequest->id);
+
+        Notification::send(
+            $equipmentRequest->user_id,
+            'Equipment Issued',
+            "Your requested equipment \"{$equipmentRequest->equipment->name}\" has been issued and marked as borrowed.",
+            'success',
+            '/dashboard?section=borrowed-equipment'
+        );
+
+        return back()->with('success', 'Equipment marked as borrowed / picked up successfully.');
+    }
+
     // ─── Bulk Approve ───
 
     public function bulkApprove(Request $request)

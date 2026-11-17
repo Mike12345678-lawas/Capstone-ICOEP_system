@@ -169,17 +169,26 @@ class Event extends Model
 
     public function isVisibleTo(?User $user): bool
     {
-        $audiences = $this->getTargetAudiences();
-        if (in_array(self::AUDIENCE_ALL, $audiences, true)) {
-            return true;
-        }
-
         if (!$user) {
-            return false;
+            if (in_array($this->status, ['pending', 'rejected'], true)) {
+                return false;
+            }
+            $audiences = $this->getTargetAudiences();
+            return in_array(self::AUDIENCE_ALL, $audiences, true);
         }
 
         // Administrators and the creator/organizer can always view
         if ($user->hasRole('Administrator') || $this->organizer_id === $user->id) {
+            return true;
+        }
+
+        // Unapproved / rejected events are hidden from everyone except admins and the organizer
+        if (in_array($this->status, ['pending', 'rejected'], true)) {
+            return false;
+        }
+
+        $audiences = $this->getTargetAudiences();
+        if (in_array(self::AUDIENCE_ALL, $audiences, true)) {
             return true;
         }
 

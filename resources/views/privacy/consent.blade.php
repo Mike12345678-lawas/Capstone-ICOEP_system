@@ -57,7 +57,7 @@
                     3. Protection &amp; Confidentiality
                 </h4>
                 <p style="margin: 0;">
-                    Passcodes are cryptographically hashed using Bcrypt. Sensitive information is never sold or shared with unauthorized third parties. Personal schedules are masked on public calendars.
+                    Passcodes are cryptographically hashed using Bcrypt. Sensitive information is never sold or shared with unauthorized third parties.
                 </p>
             </div>
 

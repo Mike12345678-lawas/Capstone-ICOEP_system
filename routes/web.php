@@ -109,7 +109,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/facilities/{facility}', [FacilityController::class, 'destroy'])->middleware('permission:facility.manage,facility.approve');
     Route::get('/facilities/{facility}', [FacilityController::class, 'show'])->middleware('permission:facility.view');
     Route::get('/equipment/create', [EquipmentController::class, 'create'])->middleware('permission:equipment.manage,inventory.manage_own');
-    Route::get('/equipment/returns', [EquipmentReturnController::class, 'index'])->middleware('permission:equipment.approve');
+    Route::get('/equipment/returns', [EquipmentReturnController::class, 'index'])->middleware('permission:equipment.return');
     Route::get('/equipment/{equipment}', [EquipmentController::class, 'show'])->middleware('permission:equipment.view');
     Route::get('/events/my', [EventController::class, 'myEvents'])->middleware('permission:event.view');
     Route::get('/events/create', [EventController::class, 'create'])->middleware('permission:event.create');
@@ -136,12 +136,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/equipment-requests/bulk-approve', [EquipmentController::class, 'bulkApprove'])->middleware('permission:equipment.approve');
     Route::patch('/equipment-requests/{equipmentRequest}/cancel', [EquipmentController::class, 'cancelOwn']);
 
-    // ─── Equipment Returns ───
+    // ─── Equipment Pickup & Returns ───
+    Route::post('/equipment-requests/{equipmentRequest}/pickup', [EquipmentController::class, 'pickup'])->middleware('permission:equipment.issue');
+    Route::patch('/equipment-requests/{equipmentRequest}/pickup', [EquipmentController::class, 'pickup'])->middleware('permission:equipment.issue');
     Route::post('/equipment-requests/{equipmentRequest}/return-request', [EquipmentReturnController::class, 'requestReturn']);
     Route::post('/equipment-requests/{equipmentRequest}/cancel-return-request', [EquipmentReturnController::class, 'cancelReturnRequest']);
     Route::delete('/equipment-requests/{equipmentRequest}/return-request', [EquipmentReturnController::class, 'cancelReturnRequest']);
-    Route::post('/equipment-requests/{equipmentRequest}/confirm-return', [EquipmentReturnController::class, 'confirmReturn'])->middleware('permission:equipment.approve');
-    Route::post('/equipment-requests/{equipmentRequest}/send-reminder', [EquipmentReturnController::class, 'sendReminder'])->middleware('permission:equipment.approve');
+    Route::post('/equipment-requests/{equipmentRequest}/confirm-return', [EquipmentReturnController::class, 'confirmReturn'])->middleware('permission:equipment.return');
+    Route::post('/equipment-requests/{equipmentRequest}/send-reminder', [EquipmentReturnController::class, 'sendReminder'])->middleware('permission:equipment.return');
 
     // ─── Equipment Inventory CRUD (Admin / Custodians) ───
     Route::post('/equipment', [EquipmentController::class, 'store'])->middleware('permission:equipment.manage,inventory.manage_own');

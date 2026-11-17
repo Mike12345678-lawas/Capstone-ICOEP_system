@@ -267,8 +267,12 @@ class EventController extends Controller
 
     public function updateStatus(Request $request, Event $event)
     {
+        if (!Auth::user()->hasRole('Administrator')) {
+            abort(403, 'Unauthorized. Only administrators can update event status.');
+        }
+
         $request->validate([
-            'status'  => 'required|in:pending,upcoming,ongoing,completed,cancelled,rejected',
+            'status'  => 'required|in:upcoming,ongoing,completed,cancelled,rejected',
             'remarks' => 'nullable|string|max:500',
         ]);
 
@@ -321,6 +325,14 @@ class EventController extends Controller
 
     public function approve(Event $event)
     {
+        if (!Auth::user()->hasRole('Administrator')) {
+            abort(403, 'Unauthorized. Only administrators can approve events.');
+        }
+
+        if ($event->status !== 'pending') {
+            return back()->with('error', 'Only pending event requests can be approved.');
+        }
+
         $oldStatus = $event->status;
         $event->update([
             'status'      => 'upcoming',
@@ -345,6 +357,14 @@ class EventController extends Controller
 
     public function reject(Request $request, Event $event)
     {
+        if (!Auth::user()->hasRole('Administrator')) {
+            abort(403, 'Unauthorized. Only administrators can reject events.');
+        }
+
+        if ($event->status !== 'pending') {
+            return back()->with('error', 'Only pending event requests can be rejected.');
+        }
+
         $request->validate([
             'remarks' => 'nullable|string|max:500',
         ]);

@@ -21,6 +21,8 @@ class PermissionSeeder extends Seeder
             ['name' => 'equipment.borrow', 'description' => 'Submit equipment borrow requests'],
             ['name' => 'equipment.manage', 'description' => 'Manage equipment inventory (add/edit/delete)'],
             ['name' => 'equipment.approve','description' => 'Approve/reject equipment requests (Admin only)'],
+            ['name' => 'equipment.issue',  'description' => 'Issue approved equipment for pickup'],
+            ['name' => 'equipment.return', 'description' => 'Process and confirm equipment returns'],
             ['name' => 'inventory.manage_own', 'description' => 'Manage own unit equipment inventory'],
             // Events
             ['name' => 'event.view',       'description' => 'View events list'],
@@ -58,7 +60,7 @@ class PermissionSeeder extends Seeder
             'Administrator' => Permission::pluck('name')->toArray(), // All permissions
             'Staff' => [
                 'facility.view', 'facility.reserve',
-                'equipment.view', 'equipment.borrow', 'equipment.manage', 'equipment.approve', 'inventory.manage_own',
+                'equipment.view', 'equipment.borrow', 'equipment.manage', 'equipment.issue', 'equipment.return', 'inventory.manage_own',
                 'event.view', 'event.create', 'event.manage',
                 'announcement.view',
                 'dashboard.admin_stats',

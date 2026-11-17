@@ -30,12 +30,14 @@ class CalendarController extends Controller
             $startDate = $start->toDateString();
             $endDate = $end->toDateString();
 
+            $currentUser = auth()->user();
+
             // 3. Fetch facility reservations (Pending, Approved, Completed)
             $reservations = FacilityReservation::with(['facility', 'user'])
                 ->whereIn('status', ['approved', 'pending', 'completed'])
                 ->whereBetween('reservation_date', [$startDate, $endDate])
                 ->get()
-                ->map(function ($res) {
+                ->map(function ($res) use ($currentUser) {
                     $isPending = $res->status === 'pending';
                     $color = $isPending ? '#f59e0b' : '#10b981';
                     $borderColor = $isPending ? '#d97706' : '#059669';
@@ -49,9 +51,14 @@ class CalendarController extends Controller
                     $startFormatted = $timeStart ? "{$dateStr}T{$timeStart}:00" : $dateStr;
                     $endFormatted = $timeEnd ? "{$dateStr}T{$timeEnd}:00" : ($timeStart ? "{$dateStr}T{$timeStart}:00" : null);
 
+                    $isOwnerOrAdmin = $currentUser && ($currentUser->hasRole('Administrator') || $currentUser->id === $res->user_id);
+                    $displayTitle   = $isOwnerOrAdmin ? $res->title : 'Reserved';
+                    $displayBooker  = $isOwnerOrAdmin ? ($res->user ? ($res->user->first_name . ' ' . $res->user->last_name) : 'User') : 'Reserved';
+                    $displayDesc    = $isOwnerOrAdmin ? $res->description : null;
+
                     return [
                         'id' => 'res_' . $res->id,
-                        'title' => $statusLabel . $facilityName . ' - ' . $res->title,
+                        'title' => $statusLabel . $facilityName . ' - ' . $displayTitle,
                         'start' => $startFormatted,
                         'end' => $endFormatted,
                         'allDay' => empty($timeStart),
@@ -62,9 +69,9 @@ class CalendarController extends Controller
                         'extendedProps' => [
                             'type' => 'reservation',
                             'reservation_status' => $res->status,
-                            'description' => $res->description,
+                            'description' => $displayDesc,
                             'facility' => $facilityName,
-                            'booker' => $res->user ? ($res->user->first_name . ' ' . $res->user->last_name) : 'User',
+                            'booker' => $displayBooker,
                             'time' => ($timeStart && $timeEnd) ? "{$timeStart} - {$timeEnd}" : 'All Day',
                         ]
                     ];

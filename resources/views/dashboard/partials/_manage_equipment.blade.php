@@ -115,16 +115,15 @@
                                     <button class="btn btn-danger btn-sm btn-action-large"
                                         onclick="openEqRejectModal({{ $req->id }}, this)">Reject</button>
                                 </div>
-                            @elseif(auth()->user()->hasPermission('equipment.approve') && $req->status === 'approved')
+                            @elseif((auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('equipment.issue')) && $req->status === 'approved')
                                 <div class="btn-group" style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                                    <form method="POST" action="{{ url('/equipment-requests/' . $req->id . '/status') }}" style="margin:0;">
-                                        @csrf @method('PATCH')
-                                        <input type="hidden" name="status" value="borrowed">
+                                    <form method="POST" action="{{ url('/equipment-requests/' . $req->id . '/pickup') }}" style="margin:0;">
+                                        @csrf
                                         <button type="submit" class="btn btn-primary btn-sm" style="font-size: 0.75rem;">Release (Mark Borrowed)</button>
                                     </form>
                                     <a href="{{ url('/dashboard?section=equipment-returns&request_id=' . $req->id) }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">Return Desk</a>
                                 </div>
-                            @elseif(auth()->user()->hasPermission('equipment.approve') && $req->status === 'borrowed')
+                            @elseif((auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('equipment.return')) && $req->status === 'borrowed')
                                 <a href="{{ url('/dashboard?section=equipment-returns&request_id=' . $req->id) }}" class="btn btn-primary btn-sm" style="font-size: 0.75rem;">Process Return</a>
                             @else
                                 <span class="text-muted">—</span>

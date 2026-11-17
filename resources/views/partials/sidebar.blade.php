@@ -121,7 +121,7 @@
             </div>
         </div>
 
-        @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('facility.approve') || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('user.view') || auth()->user()->hasPermission('equipment.manage') || auth()->user()->hasPermission('inventory.manage_own') || auth()->user()->hasPermission('facility.manage') || auth()->user()->hasPermission('event.manage'))
+        @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('facility.approve') || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('user.view') || auth()->user()->hasPermission('equipment.manage') || auth()->user()->hasPermission('inventory.manage_own') || auth()->user()->hasPermission('facility.manage') || auth()->user()->hasPermission('event.manage') || auth()->user()->hasPermission('equipment.issue') || auth()->user()->hasPermission('equipment.return'))
         <div class="nav-section">
             <div class="nav-section-title">
                 <span>Management</span>
@@ -179,7 +179,7 @@
                 </a>
                 @endif
 
-                @if(auth()->user()->hasPermission('equipment.approve'))
+                @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('equipment.approve'))
                 <a href="{{ url('/dashboard?section=manage-equipment') }}" class="nav-link {{ ($currentSection ?? '') === 'manage-equipment' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
@@ -187,7 +187,9 @@
                     </svg>
                     <span>Equipment Requests</span>
                 </a>
+                @endif
 
+                @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('equipment.return'))
                 <a href="{{ url('/dashboard?section=equipment-returns') }}" class="nav-link {{ ($currentSection === 'equipment-returns' || request()->is('equipment/returns*')) ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="1 4 1 10 7 10"></polyline>
@@ -197,7 +199,7 @@
                 </a>
                 @endif
 
-                @if(auth()->user()->custodian_unit_id || auth()->user()->hasPermission('inventory.manage_own') || auth()->user()->hasRole('Administrator'))
+                @if(auth()->user()->custodian_unit_id || auth()->user()->hasPermission('inventory.manage_own') || auth()->user()->hasPermission('equipment.issue') || auth()->user()->hasRole('Administrator'))
                 <a href="{{ url('/dashboard?section=pickup-queue') }}" class="nav-link {{ $currentSection === 'pickup-queue' ? 'active' : '' }}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>

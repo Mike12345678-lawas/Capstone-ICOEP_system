@@ -298,7 +298,7 @@ class StaffEventAndCustodianTest extends TestCase
     }
 
     /**
-     * Test Staff maintains permissions to manage equipment, inventory, and equipment approval.
+     * Test Staff maintains permissions to manage equipment, inventory, and equipment issue/return.
      */
     public function test_staff_has_equipment_and_inventory_management_permissions(): void
     {
@@ -306,7 +306,9 @@ class StaffEventAndCustodianTest extends TestCase
         $permissions = $staffRole->permissions->pluck('name')->toArray();
 
         $this->assertContains('equipment.manage', $permissions, 'Staff must have equipment.manage permission.');
-        $this->assertContains('equipment.approve', $permissions, 'Staff must have equipment.approve permission.');
+        $this->assertContains('equipment.issue', $permissions, 'Staff must have equipment.issue permission.');
+        $this->assertContains('equipment.return', $permissions, 'Staff must have equipment.return permission.');
+        $this->assertNotContains('equipment.approve', $permissions, 'Staff must NOT have equipment.approve permission.');
         $this->assertContains('inventory.manage_own', $permissions, 'Staff must have inventory.manage_own permission.');
         $this->assertNotContains('announcement.create', $permissions, 'Staff must NOT have announcement.create permission.');
     }

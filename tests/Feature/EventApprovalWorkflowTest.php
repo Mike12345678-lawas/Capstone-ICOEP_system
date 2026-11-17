@@ -279,4 +279,226 @@ class EventApprovalWorkflowTest extends TestCase
         $event->refresh();
         $this->assertEquals(Event::STATUS_PENDING, $event->status);
     }
+
+    /**
+     * Staff cannot approve, reject, or update status of events (Admin only).
+     */
+    public function test_staff_cannot_approve_reject_or_update_event_status(): void
+    {
+        $event = Event::create([
+            'title'            => 'Staff Review Event',
+            'description'      => 'Staff review.',
+            'objectives'       => 'Test event permissions.',
+            'event_type'       => 'academic',
+            'target_audience'  => 'all',
+            'event_date'       => Carbon::now()->addDays(12)->format('Y-m-d'),
+            'time_start'       => '10:00',
+            'time_end'         => '12:00',
+            'venue'            => 'Auditorium',
+            'max_participants' => 50,
+            'organizer_id'     => $this->faculty->id,
+            'status'           => Event::STATUS_PENDING,
+            'approved_by'      => null,
+        ]);
+
+        // Staff tries to approve
+        $this->actingAs($this->staff)->patch("/events/{$event->id}/approve")->assertStatus(403);
+
+        // Staff tries to reject
+        $this->actingAs($this->staff)->patch("/events/{$event->id}/reject", [
+            'remarks' => 'Staff rejecting',
+        ])->assertStatus(403);
+
+        // Staff tries to updateStatus
+        $this->actingAs($this->staff)->patch("/events/{$event->id}/status", [
+            'status' => 'upcoming',
+        ])->assertStatus(403);
+
+        $this->assertEquals(Event::STATUS_PENDING, $event->fresh()->status);
+    }
+
+    /**
+     * approve() and reject() only work when status is pending.
+     */
+    public function test_approve_and_reject_only_work_when_status_is_pending(): void
+    {
+        $event = Event::create([
+            'title'            => 'Already Approved Event',
+            'description'      => 'Desc.',
+            'objectives'       => 'Objectives test.',
+            'event_type'       => 'academic',
+            'target_audience'  => 'all',
+            'event_date'       => Carbon::now()->addDays(8)->format('Y-m-d'),
+            'time_start'       => '10:00',
+            'time_end'         => '12:00',
+            'venue'            => 'Room 101',
+            'max_participants' => 30,
+            'organizer_id'     => $this->faculty->id,
+            'status'           => Event::STATUS_UPCOMING,
+            'approved_by'      => $this->admin->id,
+        ]);
+
+        // Trying to approve an upcoming event fails
+        $approveRes = $this->actingAs($this->admin)->patch("/events/{$event->id}/approve");
+        $approveRes->assertSessionHas('error');
+
+        // Trying to reject an upcoming event fails
+        $rejectRes = $this->actingAs($this->admin)->patch("/events/{$event->id}/reject", ['remarks' => 'Late reject']);
+        $rejectRes->assertSessionHas('error');
+
+        $this->assertEquals(Event::STATUS_UPCOMING, $event->fresh()->status);
+    }
+
+    /**
+     * updateStatus() validation does not allow pending.
+     */
+    public function test_update_status_does_not_allow_pending(): void
+    {
+        $event = Event::create([
+            'title'            => 'Status Test Event',
+            'description'      => 'Desc.',
+            'objectives'       => 'Objectives test.',
+            'event_type'       => 'academic',
+            'target_audience'  => 'all',
+            'event_date'       => Carbon::now()->addDays(8)->format('Y-m-d'),
+            'time_start'       => '10:00',
+            'time_end'         => '12:00',
+            'venue'            => 'Room 101',
+            'max_participants' => 30,
+            'organizer_id'     => $this->faculty->id,
+            'status'           => Event::STATUS_UPCOMING,
+            'approved_by'      => $this->admin->id,
+        ]);
+
+        $res = $this->actingAs($this->admin)->patch("/events/{$event->id}/status", [
+            'status' => 'pending',
+        ]);
+        $res->assertSessionHasErrors('status');
+    }
+
+    /**
+     * Unapproved events are hidden in isVisibleTo() from non-organizers even with all audience.
+     */
+    public function test_unapproved_events_are_hidden_from_non_organizers_even_with_all_audience(): void
+    {
+        $pendingEvent = Event::create([
+            'title'            => 'Secret Unapproved Event',
+            'description'      => 'Desc.',
+            'objectives'       => 'Objectives test.',
+            'event_type'       => 'academic',
+            'target_audience'  => 'all',
+            'event_date'       => Carbon::now()->addDays(8)->format('Y-m-d'),
+            'time_start'       => '10:00',
+            'time_end'         => '12:00',
+            'venue'            => 'Room 101',
+            'max_participants' => 30,
+            'organizer_id'     => $this->faculty->id,
+            'status'           => Event::STATUS_PENDING,
+            'approved_by'      => null,
+        ]);
+
+        // Student and Staff cannot see it
+        $this->assertFalse($pendingEvent->isVisibleTo($this->student));
+        $this->assertFalse($pendingEvent->isVisibleTo($this->staff));
+
+        // Organizer and Admin can see it
+        $this->assertTrue($pendingEvent->isVisibleTo($this->faculty));
+        $this->assertTrue($pendingEvent->isVisibleTo($this->admin));
+
+        // Rejected event is also hidden
+        $pendingEvent->update(['status' => Event::STATUS_REJECTED]);
+        $this->assertFalse($pendingEvent->isVisibleTo($this->student));
+        $this->assertTrue($pendingEvent->isVisibleTo($this->faculty));
+        $this->assertTrue($pendingEvent->isVisibleTo($this->admin));
+    }
+
+    /**
+     * Calendar masks reservation title and booker name for non-owners.
+     */
+    public function test_calendar_masks_personal_schedules_for_non_owners(): void
+    {
+        $facility = \App\Models\Facility::create([
+            'name'     => 'Conference Hall',
+            'location' => 'Building A',
+            'capacity' => 100,
+            'status'   => 'available',
+        ]);
+
+        $reservation = \App\Models\FacilityReservation::create([
+            'facility_id'      => $facility->id,
+            'user_id'          => $this->faculty->id,
+            'title'            => 'Private Strategy Meeting',
+            'purpose'          => 'Confidential discussion',
+            'reservation_date' => now()->addDays(3)->toDateString(),
+            'time_start'       => '09:00:00',
+            'time_end'         => '11:00:00',
+            'status'           => 'approved',
+        ]);
+
+        // Student calls calendar: title and booker are masked
+        $res = $this->actingAs($this->student)->getJson('/api/calendar/events');
+        $res->assertOk();
+        $items = collect($res->json());
+        $calRes = $items->firstWhere('id', 'res_' . $reservation->id);
+        $this->assertNotNull($calRes);
+        $this->assertStringContainsString('Reserved', $calRes['title']);
+        $this->assertStringNotContainsString('Private Strategy Meeting', $calRes['title']);
+        $this->assertEquals('Reserved', $calRes['extendedProps']['booker']);
+
+        // Owner (Faculty) calls calendar: full details visible
+        $ownerRes = $this->actingAs($this->faculty)->getJson('/api/calendar/events');
+        $ownerRes->assertOk();
+        $ownerItems = collect($ownerRes->json());
+        $ownerCalRes = $ownerItems->firstWhere('id', 'res_' . $reservation->id);
+        $this->assertStringContainsString('Private Strategy Meeting', $ownerCalRes['title']);
+        $this->assertStringContainsString($this->faculty->first_name, $ownerCalRes['extendedProps']['booker']);
+    }
+
+    /**
+     * Staff has equipment.issue and equipment.return but cannot approve equipment.
+     */
+    public function test_staff_equipment_issue_and_return_flow(): void
+    {
+        $equipment = \App\Models\Equipment::create([
+            'name'               => 'Epson Projector',
+            'category'           => 'Electronics',
+            'quantity'           => 5,
+            'available_quantity' => 5,
+            'status'             => 'available',
+        ]);
+
+        $eqReq = \App\Models\EquipmentRequest::create([
+            'equipment_id'         => $equipment->id,
+            'user_id'              => $this->student->id,
+            'quantity'             => 1,
+            'purpose'              => 'Class Presentation',
+            'date_needed'          => now()->addDays(2)->toDateString(),
+            'expected_return_date' => now()->addDays(5)->toDateString(),
+            'status'               => 'pending',
+        ]);
+
+        // Staff cannot approve equipment request (returns 403)
+        $this->actingAs($this->staff)->patch("/equipment-requests/{$eqReq->id}/status", [
+            'status' => 'approved',
+        ])->assertStatus(403);
+
+        // Admin approves it
+        $this->actingAs($this->admin)->patch("/equipment-requests/{$eqReq->id}/status", [
+            'status' => 'approved',
+        ])->assertRedirect();
+        $this->assertEquals('approved', $eqReq->fresh()->status);
+
+        // Staff can issue approved equipment for pickup via pickup route
+        $issueRes = $this->actingAs($this->staff)->post("/equipment-requests/{$eqReq->id}/pickup");
+        $issueRes->assertRedirect();
+        $this->assertEquals('borrowed', $eqReq->fresh()->status);
+
+        // Staff can confirm return
+        $returnRes = $this->actingAs($this->staff)->post("/equipment-requests/{$eqReq->id}/confirm-return", [
+            'condition'   => 'good',
+            'return_type' => 'full',
+        ]);
+        $returnRes->assertRedirect();
+        $this->assertEquals('returned', $eqReq->fresh()->status);
+    }
 }

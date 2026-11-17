@@ -35,6 +35,7 @@
                         <th>Date Needed</th>
                         <th>Expected Return</th>
                         <th>Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -67,10 +68,22 @@
                         <td data-label="Status">
                             <x-status-badge :status="$req->status" />
                         </td>
+                        <td data-label="Action" class="card-actions-cell">
+                            @if($req->status === 'approved' && (auth()->user()->hasPermission('equipment.issue') || auth()->user()->hasPermission('equipment.approve')))
+                                <form method="POST" action="{{ url('/equipment-requests/' . $req->id . '/pickup') }}" style="margin: 0;" onsubmit="return confirm('Confirm issue/release of {{ addslashes($req->equipment->name) }} to {{ addslashes($req->user->full_name) }}?');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Issue Item</button>
+                                </form>
+                            @elseif($req->status === 'borrowed')
+                                <a href="{{ url('/dashboard?section=equipment-returns&request_id=' . $req->id) }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Return Desk</a>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted" style="padding: 2rem 1rem;">
+                        <td colspan="8" class="text-center text-muted" style="padding: 2rem 1rem;">
                             <p style="margin-bottom: 0.5rem;">No items currently waiting in the pickup queue.</p>
                             @if(request('search'))
                                 <a href="{{ url('/dashboard?section=pickup-queue') }}" class="btn btn-secondary btn-sm">Clear Search</a>

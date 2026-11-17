@@ -539,9 +539,9 @@ class DashboardController extends Controller
     protected function loadPickupQueue(array &$data, Request $request, $user): void
     {
         $isCustodian = $user->custodian_unit_id || $user->hasPermission('inventory.manage_own');
-        $isAdmin = $user->hasRole('Administrator') || $user->hasPermission('equipment.approve') || $user->hasRole('Staff');
+        $canIssue = $user->hasRole('Administrator') || $user->hasPermission('equipment.approve') || $user->hasPermission('equipment.issue') || $user->hasRole('Staff');
 
-        if (!$isCustodian && !$isAdmin) {
+        if (!$isCustodian && !$canIssue) {
             abort(403);
         }
 
