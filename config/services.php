@@ -39,6 +39,11 @@ return [
         'calendar_id' => env('GOOGLE_CALENDAR_ID'),
         'service_account_credentials' => env('GOOGLE_SERVICE_ACCOUNT_CREDENTIALS'),
         'calendar_impersonate_email' => env('GOOGLE_CALENDAR_IMPERSONATE_EMAIL'),
+        'relay_url' => env('GMAIL_RELAY_URL'),
+    ],
+
+    'gmail_relay' => [
+        'url' => env('GMAIL_RELAY_URL'),
     ],
 
 ];

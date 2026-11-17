@@ -17,7 +17,7 @@ return new class extends Migration
             $table->date('reservation_date');
             $table->time('time_start');
             $table->time('time_end');
-            $table->enum('status', ['pending', 'approved', 'rejected', 'cancelled'])->default('pending');
+            $table->enum('status', ['pending', 'approved', 'rejected', 'cancelled', 'completed'])->default('pending');
             $table->text('remarks')->nullable();
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

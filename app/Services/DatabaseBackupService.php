@@ -325,13 +325,18 @@ class DatabaseBackupService
                 'last_auto_backup_date' => date('Y-m-d'),
             ]);
 
-            // Delete all existing backups (rotation - keeps only latest)
-            foreach ($this->getBackups() as $old) {
-                $this->deleteBackup($old['filename']);
-            }
+            // Snapshot existing backups before creating the new one
+            $oldBackups = $this->getBackups();
 
-            // Create new backup
+            // Create new backup first
             $backup = $this->createBackup();
+
+            // Delete old backups only after the new backup has succeeded (rotation - keeps only latest)
+            foreach ($oldBackups as $old) {
+                if ($old['filename'] !== $backup['filename']) {
+                    $this->deleteBackup($old['filename']);
+                }
+            }
 
             // Update settings with the completed file info
             $this->saveSettings([

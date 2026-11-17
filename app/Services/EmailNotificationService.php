@@ -27,7 +27,7 @@ class EmailNotificationService
             ];
         }
 
-        $relayUrl = env('GMAIL_RELAY_URL');
+        $relayUrl = config('services.gmail_relay.url') ?: config('services.google.relay_url') ?: env('GMAIL_RELAY_URL');
 
         // Priority 1: Google Apps Script Web Relay (Sends to any school/personal email over HTTPS)
         if (!empty($relayUrl)) {

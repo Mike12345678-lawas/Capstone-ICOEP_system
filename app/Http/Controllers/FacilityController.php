@@ -116,12 +116,10 @@ class FacilityController extends Controller
 
     public function destroy(Facility $facility)
     {
-        $activeCount = $facility->reservations()
-            ->whereIn('status', ['pending', 'approved'])
-            ->count();
+        $historyCount = $facility->reservations()->count();
 
-        if ($activeCount > 0) {
-            return back()->with('error', "Cannot delete \"{$facility->name}\" — it has {$activeCount} active or pending reservation(s).");
+        if ($historyCount > 0) {
+            return back()->with('error', "Cannot delete \"{$facility->name}\" — it has {$historyCount} reservation record(s) in history. Deletion is blocked to preserve audit and booking history.");
         }
 
         $name = $facility->name;
@@ -364,6 +362,9 @@ class FacilityController extends Controller
 
             $conflictError = DB::transaction(function () use ($reservation) {
                 $locked = FacilityReservation::lockForUpdate()->find($reservation->id);
+                if (!$locked || $locked->status !== 'pending') {
+                    return 'reservation is no longer pending';
+                }
                 $conflicts = FacilityReservation::conflicts(
                     $locked->facility_id,
                     $locked->reservation_date->toDateString(),
@@ -497,14 +498,17 @@ class FacilityController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        if (!in_array($reservation->status, ['approved', 'pending'])) {
-            return back()->with('error', 'Only active or approved reservations can be completed.');
+        if ($reservation->status !== 'approved') {
+            return back()->with('error', 'Only approved reservations can be completed.');
+        }
+
+        if (now()->lt($reservation->starts_at)) {
+            return back()->with('error', 'Cannot complete a reservation that has not started yet.');
         }
 
         $now = \Illuminate\Support\Carbon::now();
         $reservation->update([
             'status'   => 'completed',
-            'time_end' => $now->format('H:i:s'),
             'remarks'  => trim(($reservation->remarks ? $reservation->remarks . ' | ' : '') . 'Completed & facility freed to open at ' . $now->format('g:i A')),
         ]);
 

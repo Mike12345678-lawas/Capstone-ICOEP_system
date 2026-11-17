@@ -185,16 +185,20 @@ class EquipmentReturnController extends Controller
             $query = EquipmentRequest::with(['user.role', 'user.department', 'equipment', 'approver'])
                 ->whereIn('status', ['borrowed', 'approved']);
 
-            $cleanSearch = ltrim(strtoupper($search), 'REQ-');
-            $query->where(function ($q) use ($search, $cleanSearch) {
+            $cleanSearch = preg_replace('/^REQ-/i', '', $search);
+            $concatExpr = DB::connection()->getDriverName() === 'sqlite'
+                ? "first_name || ' ' || last_name"
+                : "CONCAT(first_name, ' ', last_name)";
+
+            $query->where(function ($q) use ($search, $cleanSearch, $concatExpr) {
                 if (is_numeric($cleanSearch)) {
                     $q->orWhere('id', (int) $cleanSearch);
                 }
-                $q->orWhereHas('user', function ($uq) use ($search) {
+                $q->orWhereHas('user', function ($uq) use ($search, $concatExpr) {
                     $uq->where('employee_id', $search)
                        ->orWhere('first_name', 'like', "%{$search}%")
                        ->orWhere('last_name', 'like', "%{$search}%")
-                       ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', "%{$search}%")
+                       ->orWhere(DB::raw($concatExpr), 'like', "%{$search}%")
                        ->orWhere('email', 'like', "%{$search}%");
                 })->orWhereHas('equipment', function ($eq) use ($search) {
                     $eq->where('name', 'like', "%{$search}%")
@@ -333,12 +337,11 @@ class EquipmentReturnController extends Controller
             $lockedReq->update($updateData);
 
             // Stock restoration logic:
-            // Restore only good, usable units. If damaged or missing, do NOT restore stock.
+            // Restore only good, usable units. If damaged or missing, reduce total quantity instead of setting whole item to maintenance.
             if ($condition === 'good') {
                 $lockedEquip->increment('available_quantity', $unitsBack);
             } else {
-                // Set equipment status to maintenance
-                $lockedEquip->update(['status' => 'maintenance']);
+                $lockedEquip->decrement('quantity', min($unitsBack, $lockedEquip->quantity));
             }
 
             $auditPayload = [
@@ -416,7 +419,7 @@ class EquipmentReturnController extends Controller
                 Notification::send(
                     $admin->id,
                     'Equipment Damaged/Missing Alert',
-                    "Equipment \"{$notifyPayload['equipment_name']}\" was returned by {$notifyPayload['borrower_name']} in {$notifyPayload['condition']} condition. Unit(s) set to maintenance and not restored to inventory.",
+                    "Equipment \"{$notifyPayload['equipment_name']}\" was returned by {$notifyPayload['borrower_name']} in {$notifyPayload['condition']} condition. {$notifyPayload['units_back']} unit(s) removed from inventory.",
                     'error',
                     '/equipment/' . $notifyPayload['equipment_id']
                 );

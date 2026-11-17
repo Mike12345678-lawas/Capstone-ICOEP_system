@@ -575,6 +575,15 @@ class ResourceSolver
                 ];
             }
 
+            // Rule: Requested quantity cannot exceed total equipment stock
+            if ($quantity > $lockedEquip->quantity) {
+                return [
+                    'status'  => 'rejected',
+                    'reason'  => "Requested quantity ({$quantity}) exceeds total equipment stock ({$lockedEquip->quantity}).",
+                    'request' => null,
+                ];
+            }
+
             // Rule 1: Equipment must be available
             if ($lockedEquip->status !== 'available') {
                 $reason = "Equipment \"{$lockedEquip->name}\" is currently {$lockedEquip->status} and cannot be borrowed.";

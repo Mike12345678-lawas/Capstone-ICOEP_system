@@ -63,7 +63,7 @@ class DashboardController extends Controller
     protected function loadOverview(array &$data, $user): void
     {
         $data['upcomingEvents'] = Event::active()
-            ->where('event_date', '>=', now())
+            ->where('event_date', '>=', today())
             ->orderBy('event_date')
             ->limit(5)
             ->get();

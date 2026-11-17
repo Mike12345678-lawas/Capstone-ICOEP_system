@@ -192,10 +192,6 @@ class EventController extends Controller
             return back()->with('error', 'Registration is closed for this event.');
         }
 
-        if ($event->isFull()) {
-            return back()->with('error', 'This event has reached maximum capacity.');
-        }
-
         $alreadyRegistered = EventRegistration::where('event_id', $event->id)
             ->where('user_id', Auth::id())
             ->exists();
@@ -204,27 +200,47 @@ class EventController extends Controller
             return back()->with('warning', 'You are already registered for this event.');
         }
 
+        if ($event->isFull()) {
+            return back()->with('error', 'This event has reached maximum capacity.');
+        }
+
         // Transaction with lock to prevent race conditions
-        $registration = DB::transaction(function () use ($event) {
-            $freshEvent = Event::lockForUpdate()->find($event->id);
+        try {
+            DB::transaction(function () use ($event) {
+                $freshEvent = Event::lockForUpdate()->find($event->id);
 
-            if ($freshEvent->max_participants > 0) {
-                $currentCount = EventRegistration::where('event_id', $event->id)->count();
-                if ($currentCount >= $freshEvent->max_participants) {
-                    throw new \Exception('Event is full');
+                if ($freshEvent->max_participants > 0) {
+                    $currentCount = EventRegistration::where('event_id', $event->id)->count();
+                    if ($currentCount >= $freshEvent->max_participants) {
+                        throw new \RuntimeException('Event is full');
+                    }
                 }
-            }
 
-            // Generate unique QR code token
-            $qrToken = EventRegistration::generateQrToken($event->id, Auth::id());
+                $already = EventRegistration::where('event_id', $event->id)
+                    ->where('user_id', Auth::id())
+                    ->exists();
+                if ($already) {
+                    throw new \LogicException('Already registered');
+                }
 
-            return EventRegistration::create([
-                'event_id'      => $event->id,
-                'user_id'       => Auth::id(),
-                'qr_code'       => $qrToken,
-                'registered_at' => now(),
-            ]);
-        });
+                // Generate unique QR code token
+                $qrToken = EventRegistration::generateQrToken($event->id, Auth::id());
+
+                EventRegistration::create([
+                    'event_id'      => $event->id,
+                    'user_id'       => Auth::id(),
+                    'qr_code'       => $qrToken,
+                    'registered_at' => now(),
+                ]);
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Duplicate registration database error (e.g. unique constraint race)
+            return back()->with('warning', 'You are already registered for this event.');
+        } catch (\LogicException $e) {
+            return back()->with('warning', 'You are already registered for this event.');
+        } catch (\RuntimeException $e) {
+            return back()->with('error', 'This event has reached maximum capacity.');
+        }
 
         AuditLog::log('REGISTER_EVENT', 'event_registrations', $event->id);
 

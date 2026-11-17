@@ -42,7 +42,7 @@ class CheckOverdueEquipment extends Command
         $this->info("Found {$overdue->count()} overdue equipment request(s).");
 
         foreach ($overdue as $request) {
-            $daysOverdue = $today->diffInDays($request->expected_return_date);
+            $daysOverdue = $request->expected_return_date->diffInDays($today);
             $equipment   = $request->equipment;
             $borrower    = $request->user;
 

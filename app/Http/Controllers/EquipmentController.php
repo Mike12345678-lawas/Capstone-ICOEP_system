@@ -201,7 +201,7 @@ class EquipmentController extends Controller
             'category'           => 'required|string|max:100',
             'description'        => 'nullable|string|max:1000',
             'quantity'           => 'required|integer|min:1',
-            'available_quantity' => 'required|integer|min:0',
+            'available_quantity' => 'nullable|integer|min:0',
             'status'             => 'required|in:available,maintenance,retired',
         ];
 
@@ -218,10 +218,11 @@ class EquipmentController extends Controller
             unset($validated['custodian_unit_id']);
         }
 
-        // Ensure available_quantity doesn't exceed total
-        if ($validated['available_quantity'] > $validated['quantity']) {
-            $validated['available_quantity'] = $validated['quantity'];
-        }
+        // Recompute available_quantity based on active borrowed/approved requests
+        $currentlyReserved = $equipment->requests()
+            ->whereIn('status', ['approved', 'borrowed'])
+            ->sum('quantity');
+        $validated['available_quantity'] = max(0, $validated['quantity'] - $currentlyReserved);
 
         $equipment->update($validated);
 
@@ -240,13 +241,11 @@ class EquipmentController extends Controller
             }
         }
 
-        // Prevent deletion if there are active borrow requests
-        $activeCount = $equipment->requests()
-            ->whereIn('status', ['pending', 'approved', 'borrowed'])
-            ->count();
+        // Prevent deletion if request history exists
+        $historyCount = $equipment->requests()->count();
 
-        if ($activeCount > 0) {
-            return back()->with('error', "Cannot delete \"{$equipment->name}\" — it has {$activeCount} active request(s).");
+        if ($historyCount > 0) {
+            return back()->with('error', "Cannot delete \"{$equipment->name}\" — it has {$historyCount} request record(s) in history. Deletion is blocked to preserve audit and borrow history.");
         }
 
         $name = $equipment->name;
@@ -283,6 +282,15 @@ class EquipmentController extends Controller
         ]);
 
         $user = Auth::user();
+
+        // Enforce total stock limit
+        if ($request->quantity > $equipment->quantity) {
+            $errorMsg = "Requested quantity ({$request->quantity}) exceeds total equipment stock ({$equipment->quantity}).";
+            if ($request->expectsJson()) {
+                return response()->json(['error' => $errorMsg], 422);
+            }
+            return back()->withInput()->with('error', $errorMsg);
+        }
 
         // Enforce overdue borrowing block
         $thresholdDays = (int) config('icoep.block_borrowing_after_days_overdue', 3);
@@ -528,6 +536,9 @@ class EquipmentController extends Controller
 
             $txError = DB::transaction(function () use ($eqReq) {
                 $locked    = EquipmentRequest::lockForUpdate()->find($eqReq->id);
+                if (!$locked || $locked->status !== 'pending') {
+                    return 'request is no longer pending';
+                }
                 $equipment = Equipment::lockForUpdate()->find($locked->equipment_id);
                 if ($equipment->available_quantity < $locked->quantity) {
                     return 'insufficient stock (' . $equipment->available_quantity . ' available)';

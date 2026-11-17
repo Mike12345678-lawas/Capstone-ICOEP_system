@@ -49,11 +49,10 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="available_quantity">Available Quantity *</label>
-                <input type="number" id="available_quantity" name="available_quantity" class="form-control @error('available_quantity') error @enderror"
-                       value="{{ old('available_quantity', $equipment->available_quantity) }}" min="0" required>
-                <span class="form-hint">Cannot exceed total quantity.</span>
-                @error('available_quantity') <span class="form-error">{{ $message }}</span> @enderror
+                <label class="form-label" for="available_quantity">Available Quantity (Calculated)</label>
+                <input type="number" id="available_quantity" class="form-control" style="background-color: var(--color-bg-secondary, #f3f4f6); cursor: not-allowed;"
+                       value="{{ $equipment->available_quantity }}" readonly disabled>
+                <span class="form-hint">Automatically calculated based on total quantity minus active borrows.</span>
             </div>
 
             <div class="form-group">

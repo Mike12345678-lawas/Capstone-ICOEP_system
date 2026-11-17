@@ -508,8 +508,10 @@ class UserSeeder extends Seeder
             }
         }
 
-        // Clean up legacy Maria Santos if present so Staff role count is strictly five
-        User::where('email', 'maria.santos@slmcb.edu.ph')->orWhere('employee_id', '002')->forceDelete();
+        // Clean up legacy Maria Santos if present so Staff role count is strictly five (local/testing only)
+        if (app()->environment('local', 'testing')) {
+            User::where('email', 'maria.santos@slmcb.edu.ph')->orWhere('employee_id', '002')->forceDelete();
+        }
 
         foreach ($users as $userData) {
             $user = User::where('email', $userData['email'])

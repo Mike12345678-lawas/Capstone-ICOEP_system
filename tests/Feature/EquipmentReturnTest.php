@@ -409,8 +409,8 @@ class EquipmentReturnTest extends TestCase
         // Stock must NOT have been restored
         $this->assertEquals($initialStock, $this->equipment->available_quantity, 'Damaged units must not be restored to available quantity.');
 
-        // Equipment status must be set to maintenance
-        $this->assertEquals('maintenance', $this->equipment->status);
+        // Total quantity reduced by damaged count (5 - 2 = 3) instead of setting whole item to maintenance
+        $this->assertEquals(3, $this->equipment->quantity);
 
         // Admins notified
         $this->assertDatabaseHas('notifications', [

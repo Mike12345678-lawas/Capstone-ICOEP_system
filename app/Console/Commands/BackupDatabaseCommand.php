@@ -27,19 +27,20 @@ class BackupDatabaseCommand extends Command
         $this->info('Starting database backup...');
 
         try {
-            // If --rotate flag is set, delete all existing backups first
-            if ($this->option('rotate')) {
-                $existing = $backupService->getBackups();
-                if (count($existing) > 0) {
-                    $this->info("Rotating: removing " . count($existing) . " old backup(s)...");
-                    foreach ($existing as $old) {
+            $existing = $backupService->getBackups();
+
+            $backup = $backupService->createBackup();
+
+            // If --rotate flag is set, delete old backups only after the new backup succeeded (keeps only latest)
+            if ($this->option('rotate') && count($existing) > 0) {
+                $this->info("Rotating: removing " . count($existing) . " old backup(s)...");
+                foreach ($existing as $old) {
+                    if ($old['filename'] !== $backup['filename']) {
                         $backupService->deleteBackup($old['filename']);
                         $this->line("  Deleted: {$old['filename']}");
                     }
                 }
             }
-
-            $backup = $backupService->createBackup();
 
             $this->info("Backup completed successfully!");
             $this->table(
