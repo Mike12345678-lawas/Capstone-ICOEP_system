@@ -199,7 +199,7 @@ class DashboardController extends Controller
     protected function loadBookedFacilities(array &$data, Request $request, $user): void
     {
         $status         = $request->get('status', '');
-        $isAdminOrStaff = $user->hasPermission('facility.approve') || $user->hasPermission('equipment.approve');
+        $isAdminOrStaff = $user->hasPermission('facility.approve') || $user->hasPermission('equipment.approve') || $user->hasPermission('equipment.issue') || $user->hasPermission('equipment.return');
         $defaultScope   = $isAdminOrStaff ? 'all' : 'my';
         $scope          = $request->get('scope', $defaultScope);
 
@@ -257,7 +257,7 @@ class DashboardController extends Controller
     protected function loadBorrowedEquipment(array &$data, Request $request, $user): void
     {
         $status         = $request->get('status', '');
-        $isAdminOrStaff = $user->hasPermission('equipment.approve') || $user->hasPermission('facility.approve');
+        $isAdminOrStaff = $user->hasPermission('equipment.approve') || $user->hasPermission('facility.approve') || $user->hasPermission('equipment.issue') || $user->hasPermission('equipment.return');
         $defaultScope   = $isAdminOrStaff ? 'all' : 'my';
         $scope          = $request->get('scope', $defaultScope);
 
@@ -638,7 +638,7 @@ class DashboardController extends Controller
     protected function loadManageEquipment(array &$data, Request $request): void
     {
         $user = Auth::user();
-        if (!$user->hasPermission('equipment.approve')) {
+        if (!$user->hasPermission('equipment.approve') && !$user->hasPermission('equipment.issue')) {
             abort(403);
         }
 
@@ -682,7 +682,7 @@ class DashboardController extends Controller
     protected function loadEquipmentReturns(array &$data, Request $request): void
     {
         $user = Auth::user();
-        if (!$user->hasPermission('equipment.approve')) {
+        if (!$user->hasPermission('equipment.approve') && !$user->hasPermission('equipment.return')) {
             abort(403);
         }
 

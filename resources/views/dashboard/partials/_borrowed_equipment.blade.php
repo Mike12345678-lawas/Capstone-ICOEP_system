@@ -66,7 +66,7 @@
                     @php
                         $isOverdue = ($req->status === 'borrowed' && $req->expected_return_date && $req->expected_return_date < now()->startOfDay());
                         $isMine = ($req->user_id === auth()->id());
-                        $canManage = $isMine || auth()->user()->hasPermission('equipment.approve');
+                        $canManage = $isMine || auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('equipment.return');
                     @endphp
                     <tr>
                         @if($currentScope === 'all')
@@ -168,7 +168,7 @@
                                                 <button type="submit" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;" title="Cancel return check notification">Cancel Return</button>
                                             </form>
                                         @endif
-                                        @if(auth()->user()->hasPermission('equipment.approve'))
+                                        @if(auth()->user()->hasPermission('equipment.approve') || auth()->user()->hasPermission('equipment.return'))
                                             <a href="{{ url('/equipment/returns') }}" class="btn btn-success btn-sm" style="font-size: 0.75rem;">Check &amp; Confirm</a>
                                         @endif
                                     @endif

@@ -64,7 +64,7 @@ class EquipmentReturnController extends Controller
         $admins = User::whereHas('role', function ($q) {
             $q->where('name', 'Administrator');
         })->orWhereHas('role.permissions', function ($q) {
-            $q->where('name', 'equipment.approve');
+            $q->whereIn('name', ['equipment.approve', 'equipment.return']);
         })->distinct()->get();
 
         foreach ($admins as $admin) {
@@ -412,7 +412,7 @@ class EquipmentReturnController extends Controller
             $admins = User::whereHas('role', function ($q) {
                 $q->where('name', 'Administrator');
             })->orWhereHas('role.permissions', function ($q) {
-                $q->where('name', 'equipment.approve');
+                $q->whereIn('name', ['equipment.approve', 'equipment.return']);
             })->distinct()->get();
 
             foreach ($admins as $admin) {
