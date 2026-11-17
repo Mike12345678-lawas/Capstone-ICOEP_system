@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Notification;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -82,12 +83,14 @@ class EventController extends Controller
 
     public function create()
     {
+        $isAdmin = Auth::user()->hasRole('Administrator');
+
         return view('events.create', [
-            'pageTitle' => 'Create Event',
+            'pageTitle' => $isAdmin ? 'Create Event' : 'Request Campus Event',
             'breadcrumb' => [
                 ['label' => 'Dashboard', 'url' => '/dashboard'],
                 ['label' => 'Events', 'url' => '/dashboard?section=events'],
-                ['label' => 'Create Event'],
+                ['label' => $isAdmin ? 'Create Event' : 'Request Event'],
             ],
         ]);
     }
@@ -132,6 +135,9 @@ class EventController extends Controller
 
         $targetAudienceValue = count($finalAudience) === 1 ? $finalAudience[0] : json_encode($finalAudience);
 
+        $isAdmin = Auth::user()->hasRole('Administrator');
+        $initialStatus = $isAdmin ? 'upcoming' : 'pending';
+
         $event = Event::create([
             'title'            => $request->title,
             'objectives'       => $request->objectives,
@@ -144,15 +150,32 @@ class EventController extends Controller
             'venue'            => $request->venue,
             'max_participants' => $request->max_participants ?? 0,
             'organizer_id'     => Auth::id(),
-            'status'           => 'upcoming',
+            'approved_by'      => $isAdmin ? Auth::id() : null,
+            'status'           => $initialStatus,
         ]);
 
-        AuditLog::log('CREATE_EVENT', 'events', $event->id);
+        AuditLog::log($isAdmin ? 'CREATE_EVENT' : 'REQUEST_EVENT', 'events', $event->id);
 
-        // Notify only the targeted audience
-        \App\Services\EventNotificationService::notifyAudience($event, Auth::id());
+        if ($isAdmin) {
+            // Notify target audience immediately
+            \App\Services\EventNotificationService::notifyAudience($event, Auth::id());
+            return redirect('/events/' . $event->id)->with('success', 'Event created successfully!');
+        }
 
-        return redirect('/events/' . $event->id)->with('success', 'Event created successfully!');
+        // For Staff and Faculty: notify administrators that an event request needs approval
+        $admins = User::whereHas('role', fn($q) => $q->where('name', 'Administrator'))->active()->get();
+        $organizerName = Auth::user()->full_name;
+        foreach ($admins as $admin) {
+            Notification::send(
+                $admin->id,
+                '📅 New Event Request',
+                "{$organizerName} requested an event: \"{$event->title}\" for {$event->event_date->format('M d, Y')}. Pending admin approval.",
+                'info',
+                '/events/' . $event->id
+            );
+        }
+
+        return redirect('/events/' . $event->id)->with('success', 'Event request submitted successfully! It is pending approval from the administrator.');
     }
 
     /**
@@ -245,13 +268,105 @@ class EventController extends Controller
     public function updateStatus(Request $request, Event $event)
     {
         $request->validate([
-            'status' => 'required|in:upcoming,ongoing,completed,cancelled',
+            'status'  => 'required|in:pending,upcoming,ongoing,completed,cancelled,rejected',
+            'remarks' => 'nullable|string|max:500',
         ]);
 
-        $event->update(['status' => $request->status]);
+        $oldStatus = $event->status;
+        $newStatus = $request->status;
+
+        $updateData = ['status' => $newStatus];
+        if ($request->filled('remarks')) {
+            $updateData['remarks'] = $request->remarks;
+        }
+        if (in_array($newStatus, ['upcoming', 'rejected'], true)) {
+            $updateData['approved_by'] = Auth::id();
+        }
+
+        $event->update($updateData);
         AuditLog::log('UPDATE_EVENT_STATUS', 'events', $event->id);
 
-        return back()->with('success', 'Event status updated to ' . ucfirst($request->status) . '.');
+        // When approved by Admin (transitioning from pending to upcoming)
+        if ($oldStatus === 'pending' && $newStatus === 'upcoming') {
+            Notification::send(
+                $event->organizer_id,
+                'Event Request Approved',
+                "Your event request for \"{$event->title}\" on {$event->event_date->format('M d, Y')} has been approved by the administrator.",
+                'success',
+                '/events/' . $event->id
+            );
+
+            // Notify targeted audience
+            \App\Services\EventNotificationService::notifyAudience($event, Auth::id());
+
+            return back()->with('success', 'Event request approved successfully! Targeted campus members have been notified.');
+        }
+
+        // When rejected
+        if ($newStatus === 'rejected') {
+            $remarkText = $request->filled('remarks') ? ' Reason: ' . $request->remarks : '';
+            Notification::send(
+                $event->organizer_id,
+                'Event Request Rejected',
+                "Your event request for \"{$event->title}\" was rejected by the administrator.{$remarkText}",
+                'error',
+                '/events/' . $event->id
+            );
+
+            return back()->with('success', 'Event request has been rejected.');
+        }
+
+        return back()->with('success', 'Event status updated to ' . ucfirst($newStatus) . '.');
+    }
+
+    public function approve(Event $event)
+    {
+        $oldStatus = $event->status;
+        $event->update([
+            'status'      => 'upcoming',
+            'approved_by' => Auth::id(),
+        ]);
+
+        AuditLog::log('APPROVE_EVENT', 'events', $event->id);
+
+        Notification::send(
+            $event->organizer_id,
+            'Event Request Approved',
+            "Your event request for \"{$event->title}\" on {$event->event_date->format('M d, Y')} has been approved by the administrator.",
+            'success',
+            '/events/' . $event->id
+        );
+
+        // Notify targeted audience
+        \App\Services\EventNotificationService::notifyAudience($event, Auth::id());
+
+        return back()->with('success', 'Event request approved successfully! Targeted campus members have been notified.');
+    }
+
+    public function reject(Request $request, Event $event)
+    {
+        $request->validate([
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        $event->update([
+            'status'      => 'rejected',
+            'approved_by' => Auth::id(),
+            'remarks'     => $request->remarks,
+        ]);
+
+        AuditLog::log('REJECT_EVENT', 'events', $event->id);
+
+        $remarkText = $request->filled('remarks') ? ' Reason: ' . $request->remarks : '';
+        Notification::send(
+            $event->organizer_id,
+            'Event Request Rejected',
+            "Your event request for \"{$event->title}\" was rejected by the administrator.{$remarkText}",
+            'error',
+            '/events/' . $event->id
+        );
+
+        return back()->with('success', 'Event request has been rejected.');
     }
 
     /**

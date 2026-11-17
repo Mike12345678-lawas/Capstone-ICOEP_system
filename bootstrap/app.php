@@ -15,10 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'permission' => \App\Http\Middleware\CheckPermission::class,
+            'consent'    => \App\Http\Middleware\EnsurePrivacyConsent::class,
         ]);
 
         $middleware->web(append: [
             \App\Http\Middleware\CheckActiveUser::class,
+            \App\Http\Middleware\EnsurePrivacyConsent::class,
             \App\Http\Middleware\SanitizeInput::class,
             \App\Http\Middleware\SetSecurityHeaders::class,
             \App\Http\Middleware\AutoBackup::class,

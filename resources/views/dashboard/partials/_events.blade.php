@@ -4,10 +4,15 @@
         <p class="page-subtitle">Discover and register for upcoming campus events.</p>
     </div>
     <div class="btn-group">
-        @if(auth()->user()->hasPermission('event.create'))
+        @if(auth()->user()->hasRole('Administrator'))
             <a href="{{ url('/events/create') }}" class="btn btn-primary">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 Create Event
+            </a>
+        @elseif(auth()->user()->hasPermission('event.create'))
+            <a href="{{ url('/events/create') }}" class="btn btn-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Request Event
             </a>
         @endif
     </div>
@@ -22,6 +27,9 @@
             </div>
             <div class="filter-group">
                 <a href="{{ url('/dashboard?section=events') }}" class="filter-btn {{ empty($statusFilter) ? 'active' : '' }}">All</a>
+                @if(auth()->user()->hasRole('Administrator') || auth()->user()->hasPermission('event.create'))
+                    <a href="{{ url('/dashboard?section=events&status=pending') }}" class="filter-btn {{ ($statusFilter ?? '') === 'pending' ? 'active' : '' }}">Pending</a>
+                @endif
                 <a href="{{ url('/dashboard?section=events&status=upcoming') }}" class="filter-btn {{ ($statusFilter ?? '') === 'upcoming' ? 'active' : '' }}">Upcoming</a>
                 <a href="{{ url('/dashboard?section=events&status=ongoing') }}" class="filter-btn {{ ($statusFilter ?? '') === 'ongoing' ? 'active' : '' }}">Ongoing</a>
                 <a href="{{ url('/dashboard?section=events&status=completed') }}" class="filter-btn {{ ($statusFilter ?? '') === 'completed' ? 'active' : '' }}">Completed</a>
@@ -86,8 +94,10 @@
                             <p style="margin-bottom: .5rem;">No events found.</p>
                             @if(request('search') || request('status'))
                                 <a href="{{ url('/dashboard?section=events') }}" class="btn btn-secondary btn-sm">Clear Filters</a>
-                            @else
+                            @elseif(auth()->user()->hasRole('Administrator'))
                                 <a href="{{ url('/events/create') }}" class="btn btn-primary btn-sm">Create Event</a>
+                            @elseif(auth()->user()->hasPermission('event.create'))
+                                <a href="{{ url('/events/create') }}" class="btn btn-primary btn-sm">Request Event</a>
                             @endif
                         </td>
                     </tr>

@@ -12,5 +12,9 @@ abstract class TestCase extends BaseTestCase
         $_SERVER['PHP_SELF'] = '/index.php';
         $_SERVER['SCRIPT_FILENAME'] = 'index.php';
         parent::setUp();
+
+        if (static::class !== \Tests\Feature\PrivacyConsentTest::class) {
+            $this->withoutMiddleware([\App\Http\Middleware\EnsurePrivacyConsent::class]);
+        }
     }
 }

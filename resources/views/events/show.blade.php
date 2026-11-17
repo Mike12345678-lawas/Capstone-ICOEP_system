@@ -8,7 +8,18 @@
     </div>
     <div class="header-actions-mobile">
         <div class="btn-row-mobile">
-            @if(auth()->user()->hasPermission('event.manage'))
+            @if(auth()->user()->hasRole('Administrator') && $event->status === 'pending')
+                <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}" style="display: inline;">
+                    @csrf @method('PATCH')
+                    <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">
+                        ✓ Approve Event
+                    </button>
+                </form>
+                <button type="button" class="btn btn-secondary" style="color: #ef4444;" onclick="document.getElementById('rejectModal').style.display='flex'">
+                    ✕ Reject
+                </button>
+            @endif
+            @if(auth()->user()->hasPermission('event.manage') && $event->status !== 'pending' && $event->status !== 'rejected')
                 <a href="{{ url('/events/' . $event->id . '/scanner') }}" class="btn btn-primary">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                     Scanner
@@ -20,13 +31,48 @@
     </div>
 </div>
 
+@if($event->status === 'pending')
+<div class="card animate-fade-in-up" style="animation-delay: 50ms; margin-bottom: 1.5rem; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3);">
+    <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h3 style="color: #b45309; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.25rem 0;">⏳ Pending Administrative Approval</h3>
+            <p style="color: var(--color-surface-700); margin: 0; font-size: 0.9rem;">
+                @if(auth()->user()->hasRole('Administrator'))
+                    This event request was submitted by <strong>{{ $event->organizer->full_name }}</strong> and is waiting for your review.
+                @else
+                    Your event request has been submitted to the administration. You will be notified once an administrator approves or reviews it.
+                @endif
+            </p>
+        </div>
+        @if(auth()->user()->hasRole('Administrator'))
+            <div style="display: flex; gap: 0.5rem;">
+                <form method="POST" action="{{ url('/events/' . $event->id . '/approve') }}">
+                    @csrf @method('PATCH')
+                    <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">Approve</button>
+                </form>
+                <button type="button" class="btn btn-secondary" style="color: #ef4444;" onclick="document.getElementById('rejectModal').style.display='flex'">Reject</button>
+            </div>
+        @endif
+    </div>
+</div>
+@elseif($event->status === 'rejected')
+<div class="card animate-fade-in-up" style="animation-delay: 50ms; margin-bottom: 1.5rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3);">
+    <div class="card-body">
+        <h3 style="color: #dc2626; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.25rem 0;">✕ Event Request Rejected</h3>
+        <p style="color: var(--color-surface-700); margin: 0; font-size: 0.9rem;">
+            This event request was rejected by the administrator.{{ $event->remarks ? ' Reason: ' . $event->remarks : '' }}
+        </p>
+    </div>
+</div>
+@endif
+
 <div class="grid-sidebar-layout">
     <div>
         {{-- Description --}}
         <div class="card animate-fade-in-up" style="animation-delay: 100ms;">
             <div class="card-header">
                 <div class="flex gap-sm" style="flex-wrap: wrap;">
-                    @php $statusBadge = match($event->status) { 'upcoming' => 'badge-general', 'ongoing' => 'badge-success', 'completed' => 'badge-warning', 'cancelled' => 'badge-error', default => 'badge-general' }; @endphp
+                    @php $statusBadge = match($event->status) { 'upcoming' => 'badge-general', 'ongoing' => 'badge-success', 'completed' => 'badge-warning', 'cancelled', 'rejected' => 'badge-error', 'pending' => 'badge-warning', default => 'badge-general' }; @endphp
                     <span class="badge {{ $statusBadge }}">{{ ucfirst($event->status) }}</span>
                     <span class="badge badge-general">{{ ucfirst($event->event_type) }}</span>
                     @php $auds = $event->getTargetAudiences(); @endphp
@@ -162,5 +208,26 @@
 })();
 </script>
 @endpush
+@endif
+@if(auth()->user()->hasRole('Administrator') && $event->status === 'pending')
+<div id="rejectModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #ffffff; border-radius: 12px; max-width: 480px; width: 100%; padding: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; font-size: 1.15rem; color: #dc2626;">Reject Event Request</h3>
+        <p style="color: var(--color-surface-600); font-size: 0.9rem; margin-bottom: 1rem;">
+            Are you sure you want to reject "{{ $event->title }}"? You may optionally provide a reason for the organizer.
+        </p>
+        <form method="POST" action="{{ url('/events/' . $event->id . '/reject') }}">
+            @csrf @method('PATCH')
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label" for="reject_remarks">Reason / Remarks (Optional)</label>
+                <textarea name="remarks" id="reject_remarks" class="form-control" rows="3" placeholder="Explain why this event request cannot be approved..."></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('rejectModal').style.display='none'">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #ef4444; border-color: #ef4444;">Confirm Rejection</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endif
 @endsection

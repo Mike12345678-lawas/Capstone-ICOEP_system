@@ -11,6 +11,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\PrivacyConsentController;
 use Illuminate\Support\Facades\Route;
 
 // ──────────────────────────────────────────────────
@@ -24,7 +25,7 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 
-// Privacy Policy
+// Privacy Policy & Consent
 Route::get('/privacy/policy', function () {
     return view('privacy.policy', [
         'pageTitle' => 'Data Privacy Policy',
@@ -33,7 +34,12 @@ Route::get('/privacy/policy', function () {
             ['label' => 'Privacy Policy'],
         ],
     ]);
-})->middleware('auth');
+})->name('privacy.policy')->middleware('auth');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/privacy/consent', [PrivacyConsentController::class, 'showConsentForm'])->name('privacy.consent');
+    Route::post('/privacy/consent', [PrivacyConsentController::class, 'accept'])->name('privacy.consent.accept');
+});
 
 // User Guide & System Manual
 Route::get('/user-guide', function () {
@@ -147,6 +153,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/events/{event}/register', [EventController::class, 'register'])->middleware('permission:event.view');
     Route::delete('/events/{event}/register', [EventController::class, 'cancelRegistration'])->middleware('permission:event.view');
     Route::patch('/events/{event}/status', [EventController::class, 'updateStatus'])->middleware('permission:event.manage');
+    Route::patch('/events/{event}/approve', [EventController::class, 'approve'])->middleware('permission:event.manage');
+    Route::patch('/events/{event}/reject', [EventController::class, 'reject'])->middleware('permission:event.manage');
     Route::post('/events/{event}/attendance', [EventController::class, 'markAttendance'])->middleware('permission:event.manage');
     Route::delete('/events/{event}', [EventController::class, 'destroy'])->middleware('permission:event.manage');
 

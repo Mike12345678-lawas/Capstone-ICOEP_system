@@ -61,6 +61,8 @@ class InactivityDeactivationTest extends TestCase
             'password'    => Hash::make('secret123'),
             'role_id'     => $this->studentRole->id,
             'status'      => 'active',
+            'privacy_consent' => true,
+            'privacy_consent_date' => now(),
         ], $attributes));
 
         if ($createdAt) {

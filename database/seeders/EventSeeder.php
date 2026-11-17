@@ -3,12 +3,16 @@
 namespace Database\Seeders;
 
 use App\Models\Event;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class EventSeeder extends Seeder
 {
     public function run(): void
     {
+        $admin = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->first() ?? User::first();
+        $adminId = $admin ? $admin->id : 1;
+
         $events = [
             [
                 'title'            => 'ICOEP System Launch Demo',
@@ -21,7 +25,7 @@ class EventSeeder extends Seeder
                 'time_end'         => '12:00',
                 'venue'            => 'Main Auditorium',
                 'max_participants' => 200,
-                'organizer_id'     => 1,
+                'organizer_id'     => $adminId,
                 'status'           => 'upcoming',
             ],
             [
@@ -35,7 +39,7 @@ class EventSeeder extends Seeder
                 'time_end'         => '17:00',
                 'venue'            => 'Faculty Lounge & Conference Room',
                 'max_participants' => 80,
-                'organizer_id'     => 1,
+                'organizer_id'     => $adminId,
                 'status'           => 'upcoming',
             ],
             [
@@ -49,7 +53,7 @@ class EventSeeder extends Seeder
                 'time_end'         => '12:00',
                 'venue'            => 'AVR (Audio-Visual Room)',
                 'max_participants' => 50,
-                'organizer_id'     => 1,
+                'organizer_id'     => $adminId,
                 'status'           => 'upcoming',
             ],
             [
@@ -63,7 +67,7 @@ class EventSeeder extends Seeder
                 'time_end'         => '17:30',
                 'venue'            => 'Multi-Purpose Hall',
                 'max_participants' => 150,
-                'organizer_id'     => 1,
+                'organizer_id'     => $adminId,
                 'status'           => 'upcoming',
             ],
             [
@@ -77,7 +81,7 @@ class EventSeeder extends Seeder
                 'time_end'         => '17:00',
                 'venue'            => 'Covered Court & Multi-Purpose Hall',
                 'max_participants' => 0,
-                'organizer_id'     => 2,
+                'organizer_id'     => $adminId,
                 'status'           => 'upcoming',
             ],
             [
@@ -91,7 +95,7 @@ class EventSeeder extends Seeder
                 'time_end'         => '10:00',
                 'venue'            => 'Chapel',
                 'max_participants' => 0,
-                'organizer_id'     => 1,
+                'organizer_id'     => $adminId,
                 'status'           => 'upcoming',
             ],
         ];

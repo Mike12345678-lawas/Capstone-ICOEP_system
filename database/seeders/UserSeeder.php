@@ -50,8 +50,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -67,28 +67,11 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
 
-            // ─── 2. STAFF MEMBERS (5 test accounts + original) ─────────────
-            [
-                'id_type'              => 'employee',
-                'employee_id'          => '002',
-                'first_name'           => 'Maria',
-                'last_name'            => 'Santos',
-                'email'                => 'maria.santos@slmcb.edu.ph',
-                'password'             => 'Admin01a',
-                'role_id'              => $roleStaff,
-                'department_id'        => null,
-                'custodian_unit_id'    => null,
-                'status'               => 'active',
-                'login_attempts'       => 0,
-                'locked_until'         => null,
-                'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
-            ],
+            // ─── 2. STAFF MEMBERS (5 test accounts) ─────────────────────────
             [
                 'id_type'              => 'employee',
                 'employee_id'          => '021',
@@ -98,13 +81,13 @@ class UserSeeder extends Seeder
                 'password'             => 'Admin01a',
                 'role_id'              => $roleStaff,
                 'department_id'        => null,
-                'custodian_unit_id'    => null,
+                'custodian_unit_id'    => $unitRegistrar,
                 'status'               => 'active',
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -115,13 +98,13 @@ class UserSeeder extends Seeder
                 'password'             => 'Admin01a',
                 'role_id'              => $roleStaff,
                 'department_id'        => null,
-                'custodian_unit_id'    => null,
+                'custodian_unit_id'    => $unitLibrary,
                 'status'               => 'active',
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -132,13 +115,13 @@ class UserSeeder extends Seeder
                 'password'             => 'Admin01a',
                 'role_id'              => $roleStaff,
                 'department_id'        => null,
-                'custodian_unit_id'    => null,
+                'custodian_unit_id'    => $unitMaintenance,
                 'status'               => 'active',
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -149,13 +132,13 @@ class UserSeeder extends Seeder
                 'password'             => 'Admin01a',
                 'role_id'              => $roleStaff,
                 'department_id'        => null,
-                'custodian_unit_id'    => null,
+                'custodian_unit_id'    => $unitComLab,
                 'status'               => 'active',
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -166,13 +149,13 @@ class UserSeeder extends Seeder
                 'password'             => 'Admin01a',
                 'role_id'              => $roleStaff,
                 'department_id'        => null,
-                'custodian_unit_id'    => null,
+                'custodian_unit_id'    => $unitComLab,
                 'status'               => 'active',
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
 
             // ─── 3. UNIT CUSTODIANS ────────────────────────────────────────
@@ -190,8 +173,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -207,8 +190,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -224,8 +207,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -241,8 +224,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
 
             // ─── 4. FACULTY MEMBERS (5 accounts — 1 per department + original) ──
@@ -260,8 +243,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -277,8 +260,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -294,8 +277,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -311,8 +294,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -328,8 +311,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -345,12 +328,12 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
 
             // ─── 5. TECHNICAL EVALUATORS (3 accounts) ─────────────────────
-            // Assigned: IT Instructors -> Faculty (BSIT), IT Personnel -> Staff
+            // Assigned: IT Instructors -> Faculty (BSIT), IT Personnel -> ComLab Staff
             [
                 'id_type'              => 'employee',
                 'employee_id'          => '041',
@@ -365,8 +348,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -382,8 +365,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'employee',
@@ -392,15 +375,15 @@ class UserSeeder extends Seeder
                 'last_name'            => 'Personnel',
                 'email'                => 'it.personnel@slmcb.edu.ph',
                 'password'             => 'Admin01a',
-                'role_id'              => $roleStaff,
+                'role_id'              => $roleComLab,
                 'department_id'        => $deptBSIT,
-                'custodian_unit_id'    => null,
+                'custodian_unit_id'    => $unitComLab,
                 'status'               => 'active',
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
 
             // ─── 6. ORIGINAL STUDENTS ──────────────────────────────────────
@@ -418,8 +401,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'student',
@@ -435,8 +418,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'student',
@@ -452,8 +435,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'student',
@@ -469,8 +452,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
             [
                 'id_type'              => 'student',
@@ -486,8 +469,8 @@ class UserSeeder extends Seeder
                 'login_attempts'       => 0,
                 'locked_until'         => null,
                 'last_activity_at'     => now(),
-                'privacy_consent'      => true,
-                'privacy_consent_date' => now(),
+                'privacy_consent'      => false,
+                'privacy_consent_date' => null,
             ],
         ];
 
@@ -519,11 +502,14 @@ class UserSeeder extends Seeder
                     'login_attempts'       => 0,
                     'locked_until'         => null,
                     'last_activity_at'     => now(),
-                    'privacy_consent'      => true,
-                    'privacy_consent_date' => now(),
+                    'privacy_consent'      => false,
+                    'privacy_consent_date' => null,
                 ];
             }
         }
+
+        // Clean up legacy Maria Santos if present so Staff role count is strictly five
+        User::where('email', 'maria.santos@slmcb.edu.ph')->orWhere('employee_id', '002')->forceDelete();
 
         foreach ($users as $userData) {
             $user = User::where('email', $userData['email'])

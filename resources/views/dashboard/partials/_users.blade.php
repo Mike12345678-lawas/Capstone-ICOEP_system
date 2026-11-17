@@ -47,19 +47,20 @@
             <div class="filter-group">
                 @php
                     $allQuery = array_merge(request()->query(), ['section' => 'users']);
-                    unset($allQuery['role'], $allQuery['status']);
+                    unset($allQuery['role'], $allQuery['status'], $allQuery['consent']);
                     if (empty($allQuery['search'])) unset($allQuery['search']);
                     if (empty($allQuery['department'])) unset($allQuery['department']);
 
-                    $hasActiveFilters = !empty($roleFilter) || !empty($statusFilter) || !empty($departmentFilter) || !empty($search);
+                    $hasActiveFilters = !empty($roleFilter) || !empty($statusFilter) || !empty($departmentFilter) || !empty($consentFilter) || !empty($search);
                 @endphp
-                <a href="{{ url('/dashboard?' . http_build_query($allQuery)) }}" class="filter-btn {{ empty($roleFilter) && empty($statusFilter) && empty($departmentFilter) ? 'active' : '' }}">All</a>
+                <a href="{{ url('/dashboard?' . http_build_query($allQuery)) }}" class="filter-btn {{ empty($roleFilter) && empty($statusFilter) && empty($departmentFilter) && empty($consentFilter) ? 'active' : '' }}">All</a>
                 @foreach($roles as $r)
                     @php
                         $roleQuery = array_merge(request()->query(), ['section' => 'users', 'role' => $r->id]);
                         unset($roleQuery['status']);
                         if (empty($roleQuery['search'])) unset($roleQuery['search']);
                         if (empty($roleQuery['department'])) unset($roleQuery['department']);
+                        if (empty($roleQuery['consent'])) unset($roleQuery['consent']);
                     @endphp
                     <a href="{{ url('/dashboard?' . http_build_query($roleQuery)) }}" class="filter-btn {{ ($roleFilter ?? '') == $r->id ? 'active' : '' }}">{{ $r->name }}</a>
                 @endforeach
@@ -68,9 +69,20 @@
                     unset($statusQuery['role']);
                     if (empty($statusQuery['search'])) unset($statusQuery['search']);
                     if (empty($statusQuery['department'])) unset($statusQuery['department']);
+                    if (empty($statusQuery['consent'])) unset($statusQuery['consent']);
                 @endphp
                 <a href="{{ url('/dashboard?' . http_build_query($statusQuery)) }}" class="filter-btn {{ ($statusFilter ?? '') === 'inactive_auto' ? 'active' : '' }}" title="Accounts auto-deactivated due to inactivity">
                     ⚡ Auto-Deactivated
+                </a>
+
+                @php
+                    $consentPendingQuery = array_merge(request()->query(), ['section' => 'users', 'consent' => 'pending']);
+                    unset($consentPendingQuery['status']);
+                    if (empty($consentPendingQuery['search'])) unset($consentPendingQuery['search']);
+                    if (empty($consentPendingQuery['department'])) unset($consentPendingQuery['department']);
+                @endphp
+                <a href="{{ url('/dashboard?' . http_build_query($consentPendingQuery)) }}" class="filter-btn {{ ($consentFilter ?? '') === 'pending' ? 'active' : '' }}" title="Accounts awaiting privacy consent">
+                    Consent Pending
                 </a>
 
                 @if($hasActiveFilters)
@@ -83,7 +95,7 @@
         <div class="table-responsive">
             <table class="data-table mobile-cards">
                 <thead>
-                    <tr><th>Name</th><th>ID</th><th>Email</th><th>Role</th><th>Department</th><th>Last Activity</th><th>Status</th><th>Actions</th></tr>
+                    <tr><th>Name</th><th>ID</th><th>Email</th><th>Role</th><th>Department</th><th>Last Activity</th><th>Consent</th><th>Status</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                 @forelse($users as $u)
@@ -100,6 +112,22 @@
                                 <span title="{{ $u->last_login->format('M d, Y h:i A') }}">{{ $u->last_login->diffForHumans() }} (login)</span>
                             @else
                                 <span class="text-muted">Never</span>
+                            @endif
+                        </td>
+                        <td data-label="Consent">
+                            @if($u->privacy_consent)
+                                <span class="badge badge-success" title="{{ $u->privacy_consent_date ? 'Consented on ' . $u->privacy_consent_date->format('M d, Y h:i A') : 'Consented' }}">
+                                    Consented
+                                </span>
+                                @if($u->privacy_consent_date)
+                                    <div class="text-muted" style="font-size: .75rem; margin-top: 2px;">
+                                        {{ $u->privacy_consent_date->format('M d, Y') }}
+                                    </div>
+                                @endif
+                            @else
+                                <span class="badge badge-warning" title="Awaiting consent at next login">
+                                    Pending
+                                </span>
                             @endif
                         </td>
                         <td data-label="Status">
@@ -130,7 +158,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted" style="padding: 2rem 1rem;">
+                        <td colspan="9" class="text-center text-muted" style="padding: 2rem 1rem;">
                             <p style="margin-bottom: .5rem;">No users found.</p>
                             @if(request('search') || request('role') || request('status') || request('department'))
                                 <a href="{{ url('/dashboard?section=users') }}" class="btn btn-secondary btn-sm">Clear Filters</a>

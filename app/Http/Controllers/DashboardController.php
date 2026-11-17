@@ -90,6 +90,7 @@ class DashboardController extends Controller
                     ? EquipmentRequest::pending()->whereHas('equipment', fn($q) => $q->where('custodian_unit_id', $user->custodian_unit_id))->count()
                     : EquipmentRequest::pending()->count(),
                 'upcoming_events'      => Event::active()->count(),
+                'pending_events'       => Event::where('status', 'pending')->count(),
                 'total_announcements'  => Announcement::active()->whereNull('deleted_at')->count(),
             ];
         } elseif ($isUnitScoped) {
@@ -112,6 +113,14 @@ class DashboardController extends Controller
             ->latest()
             ->limit(5)
             ->get();
+
+        if ($user->hasRole('Administrator')) {
+            $data['needsActionEventRequests'] = Event::with('organizer')
+                ->where('status', 'pending')
+                ->orderBy('created_at')
+                ->limit(5)
+                ->get();
+        }
 
         if ($user->hasPermission('facility.approve')) {
             $data['needsActionBookings'] = FacilityReservation::with(['facility', 'user'])
@@ -446,6 +455,7 @@ class DashboardController extends Controller
         $role       = $request->get('role', '');
         $status     = $request->get('status', '');
         $department = $request->get('department', '');
+        $consent    = $request->get('consent', '');
 
         if ($data['search']) {
             $query->where(function ($q) use ($data) {
@@ -473,10 +483,17 @@ class DashboardController extends Controller
             $query->where('status', $status);
         }
 
+        if ($consent === 'consented') {
+            $query->where('privacy_consent', true);
+        } elseif ($consent === 'pending') {
+            $query->where('privacy_consent', false);
+        }
+
         $data['users']            = $query->latest()->paginate(15)->withQueryString();
         $data['roles']            = Role::all();
         $data['roleFilter']       = $role;
         $data['statusFilter']     = $status;
+        $data['consentFilter']    = $consent;
         $data['departments']      = Department::orderBy('name')->get();
         $data['departmentFilter'] = $department;
     }

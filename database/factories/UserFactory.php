@@ -31,7 +31,20 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'role_id' => \App\Models\Role::firstOrCreate(['name' => 'Student'], ['description' => 'Student'])->id,
             'status' => 'active',
+            'privacy_consent' => true,
+            'privacy_consent_date' => now(),
         ];
+    }
+
+    /**
+     * Indicate that the user has not accepted the privacy consent yet.
+     */
+    public function unconsented(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'privacy_consent' => false,
+            'privacy_consent_date' => null,
+        ]);
     }
 
     /**

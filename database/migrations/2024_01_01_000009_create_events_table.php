@@ -20,7 +20,9 @@ return new class extends Migration
             $table->integer('max_participants')->default(0);
             $table->string('image_banner')->nullable();
             $table->foreignId('organizer_id')->constrained('users')->cascadeOnDelete();
-            $table->enum('status', ['upcoming', 'ongoing', 'completed', 'cancelled'])->default('upcoming');
+            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('remarks')->nullable();
+            $table->enum('status', ['pending', 'upcoming', 'ongoing', 'completed', 'cancelled', 'rejected'])->default('upcoming');
             $table->softDeletes();
             $table->timestamps();
         });

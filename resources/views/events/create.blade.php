@@ -3,8 +3,8 @@
 @section('content')
 <div class="page-header animate-fade-in-up">
     <div>
-        <h1 class="page-title">Create Event</h1>
-        <p class="page-subtitle">Schedule a new campus event for students and staff.</p>
+        <h1 class="page-title">{{ auth()->user()->hasRole('Administrator') ? 'Create Event' : 'Request Campus Event' }}</h1>
+        <p class="page-subtitle">{{ auth()->user()->hasRole('Administrator') ? 'Schedule a new campus event for students and staff.' : 'Submit an event request for administrative approval.' }}</p>
     </div>
     <a href="{{ url('/dashboard?section=events') }}" class="btn btn-secondary">Cancel</a>
 </div>
@@ -125,7 +125,7 @@
                 <textarea id="description" name="description" class="form-control" rows="6" placeholder="Describe the event details...">{{ old('description') }}</textarea>
             </div>
             <hr style="border: 0; border-top: 1px solid var(--color-surface-200); margin: 2rem 0;">
-            <button type="submit" class="btn btn-primary btn-lg">Create Event</button>
+            <button type="submit" class="btn btn-primary btn-lg">{{ auth()->user()->hasRole('Administrator') ? 'Create Event' : 'Submit Event Request' }}</button>
         </form>
     </div>
 </div>

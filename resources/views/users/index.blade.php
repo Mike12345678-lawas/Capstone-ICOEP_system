@@ -21,18 +21,21 @@
                 <input type="text" name="search" class="search-input" placeholder="Search users..." value="{{ $search }}">
             </div>
             <div class="filter-group">
-                <a href="{{ url('/users') }}" class="filter-btn {{ empty($roleFilter) && empty($statusFilter) ? 'active' : '' }}">All</a>
+                <a href="{{ url('/users') }}" class="filter-btn {{ empty($roleFilter) && empty($statusFilter) && empty($consentFilter) ? 'active' : '' }}">All</a>
                 @foreach($roles as $r)
                     <a href="{{ url('/users?role=' . $r->id) }}" class="filter-btn {{ $roleFilter == $r->id ? 'active' : '' }}">{{ $r->name }}</a>
                 @endforeach
                 <a href="{{ url('/users?status=inactive_auto') }}" class="filter-btn {{ ($statusFilter ?? '') === 'inactive_auto' ? 'active' : '' }}" title="Accounts auto-deactivated due to inactivity">
                     ⚡ Auto-Deactivated
                 </a>
+                <a href="{{ url('/users?consent=pending') }}" class="filter-btn {{ ($consentFilter ?? '') === 'pending' ? 'active' : '' }}" title="Accounts awaiting privacy consent">
+                    Consent Pending
+                </a>
             </div>
         </form>
         <div class="table-responsive">
             <table class="table">
-                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Last Activity</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Last Activity</th><th>Consent</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                 @forelse($users as $u)
                     <tr>
@@ -55,6 +58,22 @@
                                 <span title="{{ $u->last_login->format('M d, Y h:i A') }}">{{ $u->last_login->diffForHumans() }} (login)</span>
                             @else
                                 <span class="text-muted">Never</span>
+                            @endif
+                        </td>
+                        <td data-label="Consent">
+                            @if($u->privacy_consent)
+                                <span class="badge badge-success" title="{{ $u->privacy_consent_date ? 'Consented on ' . $u->privacy_consent_date->format('M d, Y h:i A') : 'Consented' }}">
+                                    Consented
+                                </span>
+                                @if($u->privacy_consent_date)
+                                    <div class="text-muted" style="font-size: .75rem; margin-top: 2px;">
+                                        {{ $u->privacy_consent_date->format('M d, Y') }}
+                                    </div>
+                                @endif
+                            @else
+                                <span class="badge badge-warning" title="Awaiting consent at next login">
+                                    Pending
+                                </span>
                             @endif
                         </td>
                         <td>
@@ -87,7 +106,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted" style="padding: 2rem;">No users found.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted" style="padding: 2rem;">No users found.</td></tr>
                 @endforelse
                 </tbody>
             </table>

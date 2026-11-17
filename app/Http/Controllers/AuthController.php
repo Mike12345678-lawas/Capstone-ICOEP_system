@@ -112,6 +112,10 @@ class AuthController extends Controller
 
         AuditLog::log('LOGIN_SUCCESS', 'users', $user->id);
 
+        if (!$user->privacy_consent) {
+            return redirect()->route('privacy.consent');
+        }
+
         return redirect()->intended('/dashboard')->with('success', 'Welcome back, ' . $user->first_name . '!');
     }
 

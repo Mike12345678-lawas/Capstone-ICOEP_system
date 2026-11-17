@@ -58,9 +58,9 @@ class PermissionSeeder extends Seeder
             'Administrator' => Permission::pluck('name')->toArray(), // All permissions
             'Staff' => [
                 'facility.view', 'facility.reserve',
-                'equipment.view', 'equipment.borrow', 'equipment.manage',
+                'equipment.view', 'equipment.borrow', 'equipment.manage', 'equipment.approve', 'inventory.manage_own',
                 'event.view', 'event.create', 'event.manage',
-                'announcement.view', 'announcement.create', 'announcement.manage', 'announcement.delete',
+                'announcement.view',
                 'dashboard.admin_stats',
             ],
             'Faculty' => [

@@ -45,22 +45,30 @@ class UserController extends Controller
             }
         }
 
+        $consentFilter = $request->get('consent');
+        if ($consentFilter === 'consented') {
+            $query->where('privacy_consent', true);
+        } elseif ($consentFilter === 'pending') {
+            $query->where('privacy_consent', false);
+        }
+
         $users = $query->orderBy('last_name')->orderBy('first_name')
             ->paginate(config('icoep.items_per_page'));
 
         $roles = Role::orderBy('id')->get();
 
         return view('users.index', [
-            'pageTitle'    => 'User Management',
-            'breadcrumb'   => [
+            'pageTitle'     => 'User Management',
+            'breadcrumb'    => [
                 ['label' => 'Dashboard', 'url' => '/dashboard'],
                 ['label' => 'User Management'],
             ],
-            'users'        => $users,
-            'roles'        => $roles,
-            'search'       => $search,
-            'roleFilter'   => $roleFilter,
-            'statusFilter' => $statusFilter,
+            'users'         => $users,
+            'roles'         => $roles,
+            'search'        => $search,
+            'roleFilter'    => $roleFilter,
+            'statusFilter'  => $statusFilter,
+            'consentFilter' => $consentFilter,
         ]);
     }
 
@@ -88,8 +96,8 @@ class UserController extends Controller
         $validated = $request->validated();
 
         $additionalData = [
-            'privacy_consent'      => true,
-            'privacy_consent_date' => now(),
+            'privacy_consent'      => false,
+            'privacy_consent_date' => null,
         ];
 
         if (($validated['status'] ?? 'active') === 'inactive') {

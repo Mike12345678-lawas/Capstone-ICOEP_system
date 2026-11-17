@@ -11,6 +11,13 @@ class Event extends Model
 {
     use SoftDeletes;
 
+    public const STATUS_PENDING   = 'pending';
+    public const STATUS_UPCOMING  = 'upcoming';
+    public const STATUS_ONGOING   = 'ongoing';
+    public const STATUS_COMPLETED = 'completed';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_REJECTED  = 'rejected';
+
     public const AUDIENCE_ALL = 'all';
     public const AUDIENCE_FACULTY = 'faculty';
     public const AUDIENCE_STAFF = 'staff';
@@ -58,7 +65,7 @@ class Event extends Model
     protected $fillable = [
         'title', 'description', 'objectives', 'event_type', 'target_audience', 'event_date',
         'time_start', 'time_end', 'venue', 'max_participants',
-        'image_banner', 'organizer_id', 'status',
+        'image_banner', 'organizer_id', 'approved_by', 'remarks', 'status',
     ];
 
     protected function casts(): array
@@ -81,6 +88,11 @@ class Event extends Model
     public function organizer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'organizer_id');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function registrations(): HasMany
@@ -150,6 +162,11 @@ class Event extends Model
         return in_array($this->status, ['upcoming', 'ongoing']);
     }
 
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
+
     public function isVisibleTo(?User $user): bool
     {
         $audiences = $this->getTargetAudiences();
@@ -199,6 +216,10 @@ class Event extends Model
             return false;
         }
 
+        if (!$this->isUpcoming()) {
+            return false;
+        }
+
         if ($user->hasRole('Administrator')) {
             return true;
         }
@@ -240,14 +261,20 @@ class Event extends Model
         return $query->whereIn('status', ['upcoming', 'ongoing']);
     }
 
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
     public function scopeVisibleTo($query, ?User $user)
     {
         if (!$user) {
-            return $query->where(function ($q) {
-                $q->whereNull('target_audience')
-                  ->orWhere('target_audience', self::AUDIENCE_ALL)
-                  ->orWhere('target_audience', 'like', '%"' . self::AUDIENCE_ALL . '"%');
-            });
+            return $query->whereNotIn('status', ['pending', 'rejected'])
+                ->where(function ($q) {
+                    $q->whereNull('target_audience')
+                      ->orWhere('target_audience', self::AUDIENCE_ALL)
+                      ->orWhere('target_audience', 'like', '%"' . self::AUDIENCE_ALL . '"%');
+                });
         }
 
         if ($user->hasRole('Administrator')) {
@@ -276,13 +303,19 @@ class Event extends Model
         }
 
         return $query->where(function ($q) use ($allowedAudiences, $user) {
-            $q->whereNull('target_audience')
-              ->orWhere('organizer_id', $user->id);
-
-            foreach ($allowedAudiences as $aud) {
-                $q->orWhere('target_audience', $aud)
-                  ->orWhere('target_audience', 'like', '%"' . $aud . '"%');
-            }
+            // Organizer can always see their own events (including pending / rejected)
+            $q->where('organizer_id', $user->id)
+              // Others only see approved (non-pending, non-rejected) events matching their audience
+              ->orWhere(function ($approvedQ) use ($allowedAudiences) {
+                  $approvedQ->whereNotIn('status', ['pending', 'rejected'])
+                            ->where(function ($audienceQ) use ($allowedAudiences) {
+                                $audienceQ->whereNull('target_audience');
+                                foreach ($allowedAudiences as $aud) {
+                                    $audienceQ->orWhere('target_audience', $aud)
+                                              ->orWhere('target_audience', 'like', '%"' . $aud . '"%');
+                                }
+                            });
+              });
         });
     }
 }

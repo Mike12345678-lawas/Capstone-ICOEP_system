@@ -5,13 +5,13 @@
     </div>
 </div>
 
-@if(isset($needsActionBookings) || isset($needsActionEquipment))
+@if(isset($needsActionBookings) || isset($needsActionEquipment) || !empty($needsActionEventRequests))
 <div class="card animate-fade-in-up" style="animation-delay: 50ms; border-left: 4px solid #f59e0b;">
     <div class="card-header" style="background: rgba(245,158,11,.06);">
         <h3 class="card-title" style="color:#b45309;">⚡ Needs Your Action</h3>
     </div>
     <div class="card-body" style="padding: 0;">
-        <div class="grid grid-2" style="gap:0;">
+        <div class="grid grid-{{ !empty($needsActionEventRequests) ? '3' : '2' }}" style="gap:0;">
             <div class="action-box-left" style="padding:1rem;">
                 <p style="font-weight:700;font-size:.85rem;margin:0 0 .5rem;">Pending Facility Bookings</p>
                 @forelse(($needsActionBookings ?? collect()) as $r)
@@ -40,6 +40,22 @@
                 <a href="{{ url('/dashboard?section=manage-equipment&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);display:inline-block;margin-top:.5rem;">View all →</a>
                 @endif
             </div>
+            @if(!empty($needsActionEventRequests))
+            <div class="action-box-right" style="padding:1rem; border-left: 1px solid var(--color-border,#e2e8f0);">
+                <p style="font-weight:700;font-size:.85rem;margin:0 0 .5rem;">Pending Event Requests</p>
+                @forelse($needsActionEventRequests as $ev)
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.35rem 0;border-bottom:1px solid var(--color-border,#e2e8f0);font-size:.85rem;">
+                    <span>{{ $ev->organizer->full_name }} — <strong>{{ $ev->title }}</strong> ({{ $ev->event_date->format('M d') }})</span>
+                    <a href="{{ url('/events/' . $ev->id) }}" class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Review</a>
+                </div>
+                @empty
+                <p class="text-muted" style="font-size:.85rem;margin:0;">None pending.</p>
+                @endforelse
+                @if($needsActionEventRequests->count() >= 5)
+                <a href="{{ url('/dashboard?section=events&status=pending') }}" style="font-size:.8rem;color:var(--color-brand-600);display:inline-block;margin-top:.5rem;">View all →</a>
+                @endif
+            </div>
+            @endif
         </div>
     </div>
 </div>
