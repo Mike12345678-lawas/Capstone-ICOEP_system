@@ -65,13 +65,17 @@ Route::get('/about-us', function () {
 Route::get('/about', fn() => redirect('/about-us'));
 
 // Direct / fallback route for uploaded storage files (facilities, return photos, equipment)
-Route::get('/storage/{path}', function ($path) {
-    $basePath = realpath(storage_path('app/public'));
+Route::get('/storage/{path}', function (string $path) {
+    $basePath   = realpath(storage_path('app/public'));
     $targetPath = realpath(storage_path('app/public/' . $path));
-    if (!$targetPath || !str_starts_with($targetPath, $basePath) || !is_file($targetPath)) {
+
+    if (!$basePath || !$targetPath
+        || !str_starts_with($targetPath, $basePath . DIRECTORY_SEPARATOR)
+        || !is_file($targetPath)) {
         abort(404);
     }
-    return response()->file($targetPath);
+
+    return response()->file($targetPath, ['Cache-Control' => 'public, max-age=86400']);
 })->where('path', '.*');
 
 // ──────────────────────────────────────────────────
@@ -187,15 +191,4 @@ Route::middleware('auth')->group(function () {
     Route::get('/backups/{filename}/download', [BackupController::class, 'download']);
     Route::delete('/backups/{filename}', [BackupController::class, 'destroy']);
 });
-
-// ─── Public Storage Fallback (serves uploaded files if symlink is unavailable) ───
-Route::get('/storage/{path}', function (string $path) {
-    $fullPath = storage_path('app/public/' . $path);
-    if (!file_exists($fullPath) || !is_file($fullPath)) {
-        abort(404);
-    }
-    return response()->file($fullPath, [
-        'Cache-Control' => 'public, max-age=86400',
-    ]);
-})->where('path', '.*');
 

@@ -28,19 +28,22 @@ trait ValidatesUsername
         $roleId = (int) ($this->input('role_id') ?? $existingRoleId);
         $role   = Role::find($roleId);
 
+        // null when creating a user, the user being edited when updating
+        $unique = Rule::unique('users', 'employee_id')->ignore($this->route('user')?->id);
+
         if (!$role) {
-            return ['nullable', 'string', 'max:50'];
+            return ['nullable', 'string', 'max:50', $unique];
         }
 
-        // Student role uses YY-NNNNN format; all others use NNN (3-digit employee number)
-        $idType  = $role->name === 'Student' ? UserIdType::Student : UserIdType::Employee;
-        $maxLen  = $idType === UserIdType::Student ? 20 : 3;
+        $idType = $role->name === 'Student' ? UserIdType::Student : UserIdType::Employee;
+        $maxLen = $idType === UserIdType::Student ? 20 : 3;
 
         return [
             'nullable',
             'string',
             'max:' . $maxLen,
             'regex:' . $idType->pattern(),
+            $unique,
         ];
     }
 
@@ -50,8 +53,9 @@ trait ValidatesUsername
     protected function employeeIdMessages(): array
     {
         return [
-            'employee_id.regex' => 'Student ID must follow the format YY-NNNNN (e.g. 24-00123). '
+            'employee_id.regex'  => 'Student ID must follow the format YY-NNNNN (e.g. 24-00123). '
                 . 'Employee number must be exactly 3 digits (e.g. 001) for Administrator, Faculty, or Staff.',
+            'employee_id.unique' => 'This ID is already registered to another account.',
         ];
     }
 }
