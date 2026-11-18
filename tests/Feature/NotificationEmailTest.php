@@ -234,6 +234,7 @@ class NotificationEmailTest extends TestCase
             ], 200),
         ]);
 
+        config(['services.gmail_relay.url' => $fakeUrl]);
         putenv("GMAIL_RELAY_URL={$fakeUrl}");
         $_ENV['GMAIL_RELAY_URL'] = $fakeUrl;
 
@@ -249,8 +250,9 @@ class NotificationEmailTest extends TestCase
                 && $request['to'] === 'juan.delacruz@gmail.com';
         });
 
-        putenv('GMAIL_RELAY_URL');
-        unset($_ENV['GMAIL_RELAY_URL']);
+        config(['services.gmail_relay.url' => null]);
+        putenv('GMAIL_RELAY_URL=');
+        unset($_ENV['GMAIL_RELAY_URL'], $_SERVER['GMAIL_RELAY_URL']);
     }
 
     public function test_overdue_equipment_reminder_action_sends_email_to_borrower(): void

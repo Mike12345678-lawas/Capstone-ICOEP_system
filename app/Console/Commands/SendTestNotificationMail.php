@@ -46,12 +46,12 @@ class SendTestNotificationMail extends Command
             $user = User::where('email', $targetEmail)->first();
             if (!$user) {
                 $this->info("User with email '{$targetEmail}' not found. Using an existing user record for recipient context...");
-                $user = User::first();
-                if (!$user) {
+                $baseUser = User::first();
+                if (!$baseUser) {
                     $this->error('No users found in database to associate with notification.');
                     return self::FAILURE;
                 }
-                // Temporary email override for testing
+                $user = clone $baseUser;
                 $user->email = $targetEmail;
             }
         }
@@ -62,7 +62,7 @@ class SendTestNotificationMail extends Command
         $link    = (string) $this->option('link');
 
         $this->info("Sending test notification to: {$targetEmail}");
-        $this->line("• Mailer: " . config('mail.default'));
+        $this->line("• Mailer: " . (config('services.gmail_relay.url') ? 'gmail-relay (HTTPS)' : config('mail.default')));
         $this->line("• From: " . config('mail.from.name') . " <" . config('mail.from.address') . ">");
         $this->line("• Title: {$title}");
         $this->line("• Type:  {$type}");
@@ -73,17 +73,23 @@ class SendTestNotificationMail extends Command
                 $title,
                 $message,
                 $type,
-                $link
+                $link,
+                false // dispatch manually below to ensure targetEmail override is respected
             );
+
+            $result = \App\Services\EmailNotificationService::send($notification, $user);
 
             $this->info("✔ Notification created successfully (ID: {$notification->id}).");
 
-            if (config('mail.default') === 'log') {
-                $this->warn("Note: MAIL_MAILER is set to 'log'. The email was written to storage/logs/laravel.log instead of live delivery.");
-            } elseif (config('services.gmail_relay.url') ?: env('GMAIL_RELAY_URL')) {
-                $this->info("✔ Email dispatched via Google Apps Script Relay (HTTPS) to {$targetEmail}!");
+            if (!empty($result['success'])) {
+                if (($result['provider'] ?? '') === 'gmail-relay') {
+                    $this->info("✔ Email dispatched via Google Apps Script Relay (HTTPS) to {$targetEmail}!");
+                } else {
+                    $this->info("✔ Email dispatched via {$result['provider']} mailer to {$targetEmail}!");
+                }
             } else {
-                $this->info("✔ Email successfully dispatched to {$targetEmail}!");
+                $this->error("Dispatch failed: " . ($result['message'] ?? 'Unknown error'));
+                return self::FAILURE;
             }
 
             return self::SUCCESS;
