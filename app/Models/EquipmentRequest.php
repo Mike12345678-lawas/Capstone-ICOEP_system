@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class EquipmentRequest extends Model
 {
@@ -56,7 +57,17 @@ class EquipmentRequest extends Model
     /** Public URL of the photo the borrower uploaded when returning the item. */
     public function getReturnPhotoUrlAttribute(): ?string
     {
-        return $this->return_photo ? asset('storage/' . $this->return_photo) : null;
+        if (!$this->return_photo) {
+            return null;
+        }
+
+        if (!Storage::disk('public')->exists($this->return_photo)
+            && !file_exists(public_path('storage/' . $this->return_photo))
+            && !file_exists(storage_path('app/public/' . $this->return_photo))) {
+            return null;
+        }
+
+        return asset('storage/' . $this->return_photo);
     }
 
     public function scopeActive($query)

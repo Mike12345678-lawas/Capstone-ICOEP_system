@@ -433,25 +433,37 @@
                 </div>
             </div>
 
-            @if($selectedRequest->return_photo_url)
+            @if($selectedRequest->return_photo || $selectedRequest->return_photo_url)
                 <div style="grid-column: 1 / -1; border-top: 1px solid var(--color-border, #e2e8f0); padding-top: 0.75rem;">
                     <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 0.5rem;">
                         Borrower Photo Proof of Return
                     </span>
-                    <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-                        <a href="{{ $selectedRequest->return_photo_url }}" target="_blank" rel="noopener" title="Open full size">
-                            <img src="{{ $selectedRequest->return_photo_url }}" alt="Return photo submitted by borrower"
-                                 style="max-width: 320px; max-height: 220px; border-radius: 8px; border: 1px solid #cbd5e1; object-fit: cover;">
-                        </a>
-                        <div style="font-size: 0.85rem; color: var(--color-text-muted); max-width: 300px;">
-                            Uploaded by {{ $selectedRequest->user?->full_name ?? 'Borrower' }} at {{ $selectedRequest->return_requested_at?->format('M d, Y h:i A') }}.
-                            <div style="margin-top: 0.5rem;">
-                                <a href="{{ $selectedRequest->return_photo_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">
-                                    View Full Size ↗
-                                </a>
+                    @if($selectedRequest->return_photo_url)
+                        <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+                            <a href="{{ $selectedRequest->return_photo_url }}" target="_blank" rel="noopener" title="Open full size">
+                                <img src="{{ $selectedRequest->return_photo_url }}" alt="Return photo submitted by borrower"
+                                     style="max-width: 320px; max-height: 220px; border-radius: 8px; border: 1px solid #cbd5e1; object-fit: cover;"
+                                     onerror="this.onerror=null; this.parentElement.parentElement.innerHTML='<div style=\'padding: 0.75rem 1rem; background: var(--color-surface, #f8fafc); border: 1px dashed var(--color-border, #cbd5e1); border-radius: 6px; color: var(--color-text-muted, #64748b); font-size: 0.85rem;\'>📷 Photo unavailable</div>';">
+                            </a>
+                            <div style="font-size: 0.85rem; color: var(--color-text-muted); max-width: 300px;">
+                                Uploaded by {{ $selectedRequest->user?->full_name ?? 'Borrower' }} at {{ $selectedRequest->return_requested_at?->format('M d, Y h:i A') }}.
+                                <div style="margin-top: 0.5rem;">
+                                    <a href="{{ $selectedRequest->return_photo_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">
+                                        View Full Size ↗
+                                    </a>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    @else
+                        <div style="display: flex; gap: 1rem; align-items: center; padding: 0.75rem 1rem; background: var(--color-surface, #f8fafc); border: 1px dashed var(--color-border, #cbd5e1); border-radius: 6px; color: var(--color-text-muted, #64748b); font-size: 0.85rem;">
+                            <span>📷 Photo unavailable</span>
+                            @if($selectedRequest->return_requested_at)
+                                <span style="font-size: 0.8rem; color: var(--color-text-muted);">
+                                    (Uploaded by {{ $selectedRequest->user?->full_name ?? 'Borrower' }} at {{ $selectedRequest->return_requested_at->format('M d, Y h:i A') }})
+                                </span>
+                            @endif
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
@@ -743,8 +755,11 @@
                                 <td data-label="Photo Proof">
                                     @if($nc->return_photo_url)
                                         <a href="{{ $nc->return_photo_url }}" target="_blank" rel="noopener" title="View uploaded return proof">
-                                            <img src="{{ $nc->return_photo_url }}" alt="Proof" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover; border: 1px solid #cbd5e1;">
+                                            <img src="{{ $nc->return_photo_url }}" alt="Proof" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover; border: 1px solid #cbd5e1;"
+                                                 onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'text-muted\' style=\'font-size:0.75rem;\'>Unavailable</span>';">
                                         </a>
+                                    @elseif($nc->return_photo)
+                                        <span class="text-muted" style="font-size: 0.8rem;">Photo unavailable</span>
                                     @else
                                         <span class="text-muted" style="font-size: 0.8rem;">None</span>
                                     @endif

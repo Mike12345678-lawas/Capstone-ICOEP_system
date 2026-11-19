@@ -130,8 +130,10 @@
                                 </div>
                                 @if($req->return_photo_url)
                                     <a href="{{ $req->return_photo_url }}" target="_blank" rel="noopener" title="View return photo" style="display: inline-block; margin-top: .35rem;">
-                                        <img src="{{ $req->return_photo_url }}" alt="Return photo" class="photo-thumb">
+                                        <img src="{{ $req->return_photo_url }}" alt="Return photo" class="photo-thumb" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'text-muted\' style=\'font-size:0.75rem;\'>Photo unavailable</span>';">
                                     </a>
+                                @elseif($req->return_photo)
+                                    <span class="text-muted" style="font-size: 0.75rem; display: block; margin-top: .35rem;">Photo unavailable</span>
                                 @endif
                             @endif
                         </td>
@@ -262,8 +264,10 @@
                         <td data-label="Photo Proof">
                             @if($ret->return_photo_url)
                                 <a href="{{ $ret->return_photo_url }}" target="_blank" rel="noopener" title="View return photo">
-                                    <img src="{{ $ret->return_photo_url }}" alt="Return photo" class="photo-thumb">
+                                    <img src="{{ $ret->return_photo_url }}" alt="Return photo" class="photo-thumb" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'text-muted\' style=\'font-size:0.75rem;\'>Photo unavailable</span>';">
                                 </a>
+                            @elseif($ret->return_photo)
+                                <span class="text-muted" style="font-size: 0.75rem;">Photo unavailable</span>
                             @else
                                 <span class="text-muted">—</span>
                             @endif

@@ -146,8 +146,10 @@
                             <td data-label="Photo">
                                 @if($item->return_photo_url)
                                     <a href="{{ $item->return_photo_url }}" target="_blank" rel="noopener" title="View return photo">
-                                        <img src="{{ $item->return_photo_url }}" alt="Return photo" class="photo-thumb">
+                                        <img src="{{ $item->return_photo_url }}" alt="Return photo" class="photo-thumb" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'text-muted\' style=\'font-size:0.75rem;\'>Photo unavailable</span>';">
                                     </a>
+                                @elseif($item->return_photo)
+                                    <span class="text-muted" style="font-size: 0.75rem;">Photo unavailable</span>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif
